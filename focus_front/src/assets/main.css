@@ -1,35 +1,46 @@
-@import './base.css';
+@import "tailwindcss";
 
-#app {
-  max-width: 1280px;
-  margin: 0 auto;
-  padding: 2rem;
-  font-weight: normal;
+/* Theme tokens — values are closed in docs/diseno-visual.md */
+@theme {
+  /* Palette */
+  --color-background: #0f1a30;
+  --color-surface: #1a2744;
+  --color-surface-elevated: #243559;
+  --color-border: #2d4070;
+  --color-text-primary: #f0ede6;
+  --color-text-secondary: #8daab8;
+  --color-text-muted: #6a90a6;
+  --color-accent: #f59e0b;
+  --color-accent-hover: #fbbf24;
+  --color-accent-soft: #1c1f38;
+  --color-success: #52b894;
+  --color-info: #45b5d4;
+  --color-danger: #fc8181;
+
+  /* Font families */
+  --font-ui: "Outfit", ui-sans-serif, system-ui, sans-serif;
+  --font-clock: "Space Mono", ui-monospace, monospace;
+
+  /* Type scale */
+  --text-title: 2rem; /* 32px */
+  --text-subtitle: 1.25rem; /* 20px */
+  --text-body: 0.9375rem; /* 15px */
+  --text-tiny: 0.75rem; /* 12px */
+  --text-clock: 5rem; /* 80px */
 }
 
-a,
-.green {
-  text-decoration: none;
-  color: hsla(160, 100%, 37%, 1);
-  transition: 0.4s;
-  padding: 3px;
-}
-
-@media (hover: hover) {
-  a:hover {
-    background-color: hsla(160, 100%, 37%, 0.2);
-  }
-}
-
-@media (min-width: 1024px) {
-  body {
-    display: flex;
-    place-items: center;
-  }
-
+/* Document defaults */
+@layer base {
+  html,
+  body,
   #app {
-    display: grid;
-    grid-template-columns: 1fr 1fr;
-    padding: 0 2rem;
+    height: 100%;
+  }
+
+  body {
+    background-color: var(--color-background);
+    color: var(--color-text-primary);
+    font-family: var(--font-ui);
+    font-size: var(--text-body);
   }
 }

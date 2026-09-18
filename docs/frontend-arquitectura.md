@@ -70,7 +70,7 @@ focus_front/
       types.ts            contratos (interfaces) de cada repositorio
       local/              implementación con localStorage
       http/               implementación con axios contra Nest (fase 2)
-      index.ts            elige implementación según VITE_DATA_SOURCE
+      index.ts            elige implementación según login (§6.2)
     assets/               main.css (entrada de Tailwind), imágenes, audio
     components/           componentes reusables, sin dominio
     composables/          useTimer, useAudio, useReminders
@@ -79,7 +79,7 @@ focus_front/
     types/                Session, Settings, Sound — tipos del dominio
     utils/                funciones puras (formatear duración, fechas)
     views/
-      timer/
+      home/
       sounds/
       stats/
       settings/
@@ -109,7 +109,7 @@ Consultar esto antes de crear cualquier archivo.
 | Lógica con estado, reusable, cada consumidor con su copia | `composables/` | `useTimer.ts` |
 | Estado global compartido por varias vistas | `stores/` | `stores/settings.ts` |
 | Componente usado por 2+ dominios, sin lógica de negocio | `components/` | `BaseButton.vue` |
-| Componente usado por un solo dominio | `views/<dominio>/` | `views/timer/TimerDisplay.vue` |
+| Componente usado por un solo dominio | `views/<dominio>/` | `views/home/TimerDisplay.vue` |
 | Pantalla completa mapeada a una ruta | `views/<dominio>/` | `views/stats/StatsView.vue` |
 | Función pura sin estado ni efectos | `utils/` | `utils/formatDuration.ts` |
 | CSS global o variables de tema | `assets/main.css` | |
@@ -126,15 +126,16 @@ Salen del Style Guide oficial de Vue y de lo observado en los repos reales.
 | Cosa | Convención | Ejemplo |
 |---|---|---|
 | Componente (archivo) | PascalCase, multipalabra | `TimerDisplay.vue` |
-| Vista de ruta | PascalCase + sufijo `View` | `TimerView.vue`, `StatsView.vue` |
+| Vista de ruta | PascalCase + sufijo `View` | `HomeView.vue`, `StatsView.vue` |
 | Componente base reusable | prefijo `Base` | `BaseButton.vue`, `BaseSlider.vue` |
+| Componente único en pantalla | prefijo `App` | `AppSidebar.vue` |
 | Composable | `use` + camelCase | `useTimer.ts` |
 | Store Pinia | `use` + nombre + `Store` | `useSettingsStore` en `stores/settings.ts` |
 | Archivo de utilidades | camelCase | `formatDuration.ts` |
 | Tipo / interfaz | PascalCase | `Session`, `SoundRepo` |
 | Test | junto al código, en `__tests__/` | `composables/__tests__/useTimer.spec.ts` |
 
-**Importaciones: siempre con el alias `@`.** El generador escribe `../views/HomeView.vue` en su router de ejemplo; eso se corrige a `@/views/timer/TimerView.vue`. El alias ya está en `vite.config.ts`.
+**Importaciones: siempre con el alias `@`.** El generador escribe `../views/HomeView.vue` en su router de ejemplo; eso se corrige a `@/views/home/HomeView.vue`. El alias ya está en `vite.config.ts`.
 
 ---
 
@@ -144,17 +145,24 @@ Salen del Style Guide oficial de Vue y de lo observado en los repos reales.
 
 Decisión de Jason: la fuente de datos tiene que poder cambiarse tocando **un solo archivo**, no tres días de trabajo. Las fases están en `proyecto.md`.
 
-### 6.2 Cómo se cambia
+### 6.2 Cómo se cambia — en tiempo de ejecución (decidido por Jason, 2026-09-17)
+
+Sin login → `local`. Con login → `http`. El mismo usuario cambia de fuente sin recargar. **No usar `import.meta.env`**: Vite lo fija al compilar y deja una sola fuente para todos.
 
 ```ts
 // src/api/index.ts
 import * as local from './local'
 import * as http from './http'
 
-export const repo = import.meta.env.VITE_DATA_SOURCE === 'http' ? http : local
+let source: typeof local | typeof http = local
+export const setDataSource = (s: 'local' | 'http') => { source = s === 'http' ? http : local }
+export const repo = () => source
 ```
-
-Todo el resto de la app importa desde `@/api`. Nunca desde `@/api/local` ni `@/api/http` directamente.
+- Se llama `repo().sessions.list()`, nunca se guarda `repo()` en una constante: quedaría congelada en la fuente de ese momento.
+- `useAuthStore` llama a `setDataSource` en login, logout **y al arrancar la app** si hay sesión guardada. Si no, al recargar vuelve a `local`.
+- `AuthRepo` (login, registro) va siempre por `http`: decide la fuente, no depende de ella.
+- `api/` no importa stores: los stores ya importan `api/` y sería una dependencia circular.
+- Todo el resto de la app importa desde `@/api`. Nunca desde `@/api/local` ni `@/api/http` directamente.
 
 ### 6.3 Reglas del contrato
 
@@ -172,7 +180,8 @@ Todo el resto de la app importa desde `@/api`. Nunca desde `@/api/local` ni `@/a
 
 Las decisiones del modelo de datos compartido con el backend (UUID desde el front, día de la sesión, zona horaria, sonidos por defecto, migración) están en `proyecto.md` §6. Acá va solo lo que es responsabilidad del navegador:
 
-- **Sesión interrumpida (PROPUESTA, no confirmada):** el reloj se espeja en `localStorage` cada ~5 s. Al abrir la app, si hay una sesión sin cerrar, se le pregunta al usuario si la guarda. Al backend solo viaja la sesión terminada. Así el backend no necesita limpiar sesiones fantasma y no se pierde una sesión larga si muere la pestaña.
+- **Datos locales editables (decidido por Jason, 2026-09-17):** cualquiera los cambia desde DevTools. Se acepta: sin cuenta, solo se engaña a sí mismo. No cifrar ni ofuscar.
+- **Sesión en curso al cerrar la pestaña: SIN DEFINIR.** Jason quiere discutirlo después, con front y back juntos, porque hay muchos casos. No implementar nada ni proponer solución por adelantado.
 
 ---
 
@@ -209,6 +218,14 @@ transcurrido = acumulado + (Date.now() - inicioDelTramo)
 - Al reanudar: `inicioDelTramo = Date.now()`.
 
 **Temporizador y cronómetro son el mismo motor, no dos implementaciones.** El temporizador tiene un umbral (`objetivo`), el cronómetro no lo tiene. Cuando `transcurrido >= objetivo` se dispara el aviso **una vez** y el contador sigue subiendo. Cero no es un final, es un umbral.
+
+**Animación del reloj: tipo tablilla abatible (flip clock).** Pedido por Jason el 2026-09-17, para cuando se escriba el código. El dígito se dobla desde la mitad horizontal hacia arriba y aparece el siguiente. Reglas que ya se saben:
+
+- **La animación la dispara el cambio del valor mostrado, nunca un temporizador propio.** Un segundo temporizador para animar se desincroniza del reloj real de §7.4.
+- **Un dígito, una tablilla.** Son cuatro o seis elementos independientes: solo se anima el que cambia. Si se anima el bloque entero, el minuto parpadea 60 veces por minuto sin necesidad.
+- **Al volver de segundo plano el valor salta.** El navegador congeló el repintado, así que pueden haber pasado 300 segundos. No se animan 300 vueltas: se pinta el valor final directo, sin transición.
+- **Respetar `prefers-reduced-motion`**: con esa preferencia activa, el dígito cambia sin animación.
+- Necesita dígitos de ancho fijo (tabulares) en la fuente, o la tablilla cambia de ancho al girar.
 
 ### 7.5 Recordatorios periódicos
 
@@ -288,9 +305,7 @@ Clases directo en el template. Evitar `@apply` salvo repetición real y probada.
 
 ## 12. Comandos verificados
 
-Corridos y comprobados el 2026-09-16.
-
-**Trampa (verificada):** en el monorepo `focus_front/` ya existe con un `README.md` vacío. El generador se frena preguntando si borra todo. Con `--force` **borra todo lo que haya en la carpeta sin preguntar**, incluidos archivos ajenos. Nunca usar `--force` en una carpeta con contenido.
+Corridos y comprobados el 2026-09-16. **Trampa (verificada):** en el monorepo `focus_front/` ya existe con un `README.md` vacío. El generador se frena preguntando si borra todo. Con `--force` **borra todo lo que haya en la carpeta sin preguntar**, incluidos archivos ajenos. Nunca usar `--force` en una carpeta con contenido.
 
 ```bash
 # Desde la raíz focus/. Primero borrar el README vacío que deja la carpeta no vacía.
@@ -302,11 +317,7 @@ npm create vue@latest focus_front -- --ts --router --pinia --vitest --eslint --p
 npm install tailwindcss @tailwindcss/vite
 ```
 
-**Si NO se usa `--bare`**, borrar: `components/HelloWorld.vue`, `components/TheWelcome.vue`, `components/WelcomeItem.vue`, `components/icons/`, `views/AboutView.vue`, `views/HomeView.vue`, `stores/counter.ts`, `assets/logo.svg`, y vaciar `assets/base.css`.
-
-Con `--bare` igual queda `stores/counter.ts` de relleno. Borrarlo.
-
-Scripts que deja el generador: `dev`, `build`, `preview`, `test:unit`, `type-check`, `lint`, `format`.
+Sin `--bare` hay que borrar ~10 archivos de ejemplo; con `--bare` igual queda `stores/counter.ts`. **Ya aplicado el 2026-09-17:** proyecto generado, limpio y con Tailwind. Scripts: `dev`, `build`, `preview`, `test:unit`, `type-check`, `lint`, `format`.
 
 ---
 
@@ -343,6 +354,5 @@ Los 3 por dominio son los codebases más grandes de la muestra. Los 7 paneles/ER
 **Nota sobre nombres:** en paneles y ERPs la capa de datos se llama `api/` (yudao tiene 502 archivos ahí). En productos que no son paneles se llama `services/`. Este proyecto usa `api/`.
 
 ---
-
 
 > El estándar de trabajo del proyecto y los errores ya cometidos están en `CLAUDE.md` §4.
