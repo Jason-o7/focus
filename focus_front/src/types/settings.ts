@@ -1,3 +1,6 @@
+import type { TimerMode } from '@/types/timer'
+import { MINUTE_MS } from '@/utils/duration'
+
 /** User preferences for a session. */
 export interface Settings {
   soundId: string
@@ -5,6 +8,9 @@ export interface Settings {
   eyeBreakEnabled: boolean
   eyeBreakMinutes: number
   eyeBreakPresets: number[]
+  mode: TimerMode
+  focusMs: number
+  breakMs: number
 }
 
 export const DEFAULT_SETTINGS: Settings = {
@@ -13,4 +19,7 @@ export const DEFAULT_SETTINGS: Settings = {
   eyeBreakEnabled: true,
   eyeBreakMinutes: 20,
   eyeBreakPresets: [10, 15, 20],
+  mode: 'timer',
+  focusMs: 25 * MINUTE_MS,
+  breakMs: 5 * MINUTE_MS,
 }

@@ -1,4 +1,4 @@
-@import "tailwindcss";
+@import 'tailwindcss';
 
 /* Theme tokens — values are closed in docs/diseno-visual.md */
 @theme {
@@ -18,15 +18,15 @@
   --color-danger: #fc8181;
 
   /* Font families */
-  --font-ui: "Outfit", ui-sans-serif, system-ui, sans-serif;
-  --font-clock: "Space Mono", ui-monospace, monospace;
+  --font-ui: 'Outfit', ui-sans-serif, system-ui, sans-serif;
+  --font-clock: 'Space Mono', ui-monospace, monospace;
 
   /* Type scale */
   --text-title: 2rem; /* 32px */
   --text-subtitle: 1.25rem; /* 20px */
   --text-body: 0.9375rem; /* 15px */
   --text-tiny: 0.75rem; /* 12px */
-  --text-clock: 5rem; /* 80px */
+  --text-clock: 6rem; /* 96px */
 }
 
 /* Document defaults */

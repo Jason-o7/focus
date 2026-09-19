@@ -24,6 +24,14 @@ const source = computed(() => IMAGES[props.state])
 </script>
 
 <template>
-  <img :src="source" :width="size" :height="size" :class="mirror ? 'scale-x-[-1]' : ''" alt="" aria-hidden="true"
-    draggable="false" class="select-none" />
+  <img
+    :src="source"
+    :width="size"
+    :height="size"
+    :class="mirror ? 'scale-x-[-1]' : ''"
+    alt=""
+    aria-hidden="true"
+    draggable="false"
+    class="select-none"
+  />
 </template>

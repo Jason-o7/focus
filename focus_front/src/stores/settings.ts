@@ -3,6 +3,8 @@ import { computed, ref } from 'vue'
 import { repo } from '@/api'
 import { DEFAULT_SETTINGS, type Settings } from '@/types/settings'
 import { isValidEyeBreakMinutes } from '@/utils/eyeBreak'
+import { isValidBreakMs, isValidFocusMs } from '@/utils/duration'
+import type { TimerMode } from '@/types/timer'
 
 export const useSettingsStore = defineStore('settings', () => {
   // #region State
@@ -11,6 +13,9 @@ export const useSettingsStore = defineStore('settings', () => {
   const eyeBreakEnabled = ref(DEFAULT_SETTINGS.eyeBreakEnabled)
   const eyeBreakMinutes = ref(DEFAULT_SETTINGS.eyeBreakMinutes)
   const eyeBreakPresets = ref<number[]>([...DEFAULT_SETTINGS.eyeBreakPresets])
+  const mode = ref<TimerMode>(DEFAULT_SETTINGS.mode)
+  const focusMs = ref(DEFAULT_SETTINGS.focusMs)
+  const breakMs = ref(DEFAULT_SETTINGS.breakMs)
 
   const loaded = ref(false)
   const loadFailed = ref(false)
@@ -27,6 +32,9 @@ export const useSettingsStore = defineStore('settings', () => {
     eyeBreakEnabled.value = value.eyeBreakEnabled
     eyeBreakMinutes.value = value.eyeBreakMinutes
     eyeBreakPresets.value = [...value.eyeBreakPresets]
+    mode.value = value.mode
+    focusMs.value = value.focusMs
+    breakMs.value = value.breakMs
   }
 
   function snapshot(): Settings {
@@ -36,6 +44,9 @@ export const useSettingsStore = defineStore('settings', () => {
       eyeBreakEnabled: eyeBreakEnabled.value,
       eyeBreakMinutes: eyeBreakMinutes.value,
       eyeBreakPresets: [...eyeBreakPresets.value],
+      mode: mode.value,
+      focusMs: focusMs.value,
+      breakMs: breakMs.value,
     }
   }
 
@@ -111,6 +122,26 @@ export const useSettingsStore = defineStore('settings', () => {
 
     await persist()
   }
+
+  async function selectMode(value: TimerMode) {
+    if (!canEdit.value) return
+    mode.value = value
+    await persist()
+  }
+
+  async function setFocusMs(value: number) {
+    if (!canEdit.value) return
+    if (!isValidFocusMs(value)) return
+    focusMs.value = value
+    await persist()
+  }
+
+  async function setBreakMs(value: number) {
+    if (!canEdit.value) return
+    if (!isValidBreakMs(value)) return
+    breakMs.value = value
+    await persist()
+  }
   // #endregion
 
   return {
@@ -119,6 +150,9 @@ export const useSettingsStore = defineStore('settings', () => {
     eyeBreakEnabled,
     eyeBreakMinutes,
     eyeBreakPresets,
+    mode,
+    focusMs,
+    breakMs,
     loaded,
     loadFailed,
     saveFailed,
@@ -130,5 +164,8 @@ export const useSettingsStore = defineStore('settings', () => {
     setEyeBreakMinutes,
     addEyeBreakPreset,
     removeEyeBreakPreset,
+    selectMode,
+    setFocusMs,
+    setBreakMs,
   }
 })
