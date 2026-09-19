@@ -1,5 +1,6 @@
 import type { Background } from '@/types/background'
 import { DEFAULT_SETTINGS, type Settings } from '@/types/settings'
+import { isValidEyeBreakMinutes } from '@/utils/eyeBreak'
 import type { Sound } from '@/types/sound'
 
 // #region Wire shapes
@@ -18,6 +19,7 @@ export interface SettingsDto {
   backgroundId: string
   eyeBreakEnabled: boolean
   eyeBreakMinutes: number
+  eyeBreakPresets: number[]
 }
 // #endregion
 
@@ -33,7 +35,7 @@ function toSound(raw: unknown): Sound | null {
 }
 
 export function toSoundList(raw: unknown): Sound[] {
-  if (!Array.isArray(raw)) return [] // TODO: throw error
+  if (!Array.isArray(raw)) throw new Error('The sound catalog is not a list')
   return raw.map(toSound).filter((sound): sound is Sound => sound !== null)
 }
 
@@ -48,8 +50,17 @@ function toBackground(raw: unknown): Background | null {
 }
 
 export function toBackgroundList(raw: unknown): Background[] {
-  if (!Array.isArray(raw)) return [] // TODO: throw error
+  if (!Array.isArray(raw)) throw new Error('The background catalog is not a list')
   return raw.map(toBackground).filter((background): background is Background => background !== null)
+}
+
+function toMinuteList(raw: unknown, fallback: number[]): number[] {
+  if (!Array.isArray(raw)) return [...fallback]
+
+  const minutes = raw.filter(isValidEyeBreakMinutes)
+  if (minutes.length === 0) return [...fallback]
+
+  return [...new Set(minutes)].sort((a, b) => a - b)
 }
 
 export function toSettings(raw: unknown): Settings {
@@ -63,10 +74,10 @@ export function toSettings(raw: unknown): Settings {
       typeof raw.eyeBreakEnabled === 'boolean'
         ? raw.eyeBreakEnabled
         : DEFAULT_SETTINGS.eyeBreakEnabled,
-    eyeBreakMinutes:
-      typeof raw.eyeBreakMinutes === 'number' && Number.isInteger(raw.eyeBreakMinutes)
-        ? raw.eyeBreakMinutes
-        : DEFAULT_SETTINGS.eyeBreakMinutes,
+    eyeBreakMinutes: isValidEyeBreakMinutes(raw.eyeBreakMinutes)
+      ? raw.eyeBreakMinutes
+      : DEFAULT_SETTINGS.eyeBreakMinutes,
+    eyeBreakPresets: toMinuteList(raw.eyeBreakPresets, DEFAULT_SETTINGS.eyeBreakPresets),
   }
 }
 // #endregion
@@ -78,6 +89,7 @@ export function toSettingsDto(value: Settings): SettingsDto {
     backgroundId: value.backgroundId,
     eyeBreakEnabled: value.eyeBreakEnabled,
     eyeBreakMinutes: value.eyeBreakMinutes,
+    eyeBreakPresets: [...value.eyeBreakPresets],
   }
 }
 // #endregion

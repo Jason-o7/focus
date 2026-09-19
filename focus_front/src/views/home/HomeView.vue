@@ -9,8 +9,8 @@ const settings = useSettingsStore()
 const sounds = useSoundsStore()
 const backgrounds = useBackgroundsStore()
 
-onMounted(() => {
-  void Promise.all([settings.load(), sounds.load(), backgrounds.load()])
+onMounted(async () => {
+  await Promise.allSettled([settings.load(), sounds.load(), backgrounds.load()])
 })
 </script>
 

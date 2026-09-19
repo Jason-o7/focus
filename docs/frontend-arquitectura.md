@@ -68,7 +68,9 @@ focus_front/
     App.vue
     api/                  <- capa de datos. UNICO lugar con axios/localStorage (R1)
       types.ts            contratos (interfaces) de cada repositorio
+      dto.ts              forma que viaja por el cable + traducción JSON <-> entidad (§6.6)
       local/              implementación con localStorage
+        data/             .json que simulan lo que servirá el backend (catálogos)
       http/               implementación con axios contra Nest (fase 2)
       index.ts            elige implementación según login (§6.2)
     assets/               main.css (entrada de Tailwind), imágenes, audio
@@ -105,7 +107,9 @@ Consultar esto antes de crear cualquier archivo.
 |---|---|---|
 | Llama al backend o a `localStorage` | `api/` | `api/local/sessions.ts` |
 | Contrato de un repositorio | `api/types.ts` | `interface SessionRepo` |
+| Forma del dato en el cable, y su traducción | `api/dto.ts` | `SettingsDto`, `toSettings` |
 | Tipo del dominio | `types/` | `types/session.ts` |
+| Regla de negocio pura (rangos, validaciones) | `utils/` | `utils/eyeBreak.ts` |
 | Lógica con estado, reusable, cada consumidor con su copia | `composables/` | `useTimer.ts` |
 | Estado global compartido por varias vistas | `stores/` | `stores/settings.ts` |
 | Componente usado por 2+ dominios, sin lógica de negocio | `components/` | `BaseButton.vue` |
@@ -167,14 +171,16 @@ export const repo = () => source
 ### 6.3 Reglas del contrato
 
 - **R2 aplica:** todo `async`, todo `Promise`, siempre.
-- Los tipos se definen una sola vez en `api/types.ts` + `types/`. El backend los comparte después.
+- El tipo del dominio se define una sola vez en `types/`. La forma del cable vive aparte, en `api/dto.ts` (§6.6).
 - Cada método maneja errores. `localStorage` casi nunca falla; HTTP falla siempre. Si la UI no está escrita con `try/catch` y estados de carga/error desde el día uno, el cambio a HTTP la rompe.
 
 ### 6.4 Repositorios previstos
 
-`SessionRepo`, `SettingsRepo`, `SoundRepo`, `AuthRepo`.
+`SessionRepo`, `SettingsRepo`, `SoundRepo`, `BackgroundRepo`, `AuthRepo`.
 
 `AuthRepo` existe desde el inicio con una implementación local que devuelve un usuario fijo y sin pantalla de login. El motivo está en `proyecto.md` §7.
+
+`BackgroundRepo` se agregó el 2026-09-19: el catálogo de fondos es un dato como cualquier otro y ya se consume en Home.
 
 ### 6.5 Reglas del front que condicionan los datos
 
@@ -182,6 +188,17 @@ Las decisiones del modelo de datos compartido con el backend (UUID desde el fron
 
 - **Datos locales editables (decidido por Jason, 2026-09-17):** cualquiera los cambia desde DevTools. Se acepta: sin cuenta, solo se engaña a sí mismo. No cifrar ni ofuscar.
 - **Sesión en curso al cerrar la pestaña: SIN DEFINIR.** Jason quiere discutirlo después, con front y back juntos, porque hay muchos casos. No implementar nada ni proponer solución por adelantado.
+
+### 6.6 `api/dto.ts` — la traducción (2026-09-19)
+
+Es el `Model.fromJson` de Clean Architecture, en archivo aparte como `models/` en Flutter. Existe porque `api/local/sounds.ts` y `api/http/sounds.ts` reciben **el mismo JSON**: si cada uno trae su traducción, queda duplicada, y la copia que se olvida es la local, que solo falla sin cuenta.
+
+- **Entrada `unknown`, comprobación campo por campo.** `JSON.parse` puede devolver `"hola"`, `42`, `null` o un array: todos son JSON válido. Un `as Settings` miente y revienta en pantalla.
+- **Elemento roto en una lista se descarta; lo que no es una lista lanza error.** El primero es recuperable, el segundo no.
+- **Los repos locales devuelven copias** (`CATALOG.map(x => ({ ...x }))`), o el store recibe el array del módulo y un `push` lo cambia para todos. Con HTTP cada respuesta ya es nueva.
+- **`toSettingsDto` copia campo por campo, no con spread**, para que un campo de pantalla no viaje al servidor sin que nadie lo note.
+
+**Pendientes:** hoy asume que lo local y lo remoto hablan el mismo formato — cierto para los catálogos, falso para `Settings`, donde `localStorage` guarda lo que escribimos nosotros. Y los nombres no se leen como pareja: Jason propuso `settingsFromJson` / `settingsToJson`. Zod y Valibot resuelven esto declarando la forma una vez; **no se midió** su uso real en Vue.
 
 ---
 
@@ -197,7 +214,19 @@ Las decisiones del modelo de datos compartido con el backend (UUID desde el fron
 
 ### 7.2 Stores previstos
 
-`useTimerStore` (sesión activa), `useSettingsStore` (intervalo de recordatorios, volumen, duración por defecto), `useSoundsStore`, `useStatsStore`, `useAuthStore`.
+`useTimerStore` (sesión activa), `useSettingsStore` (intervalo de recordatorios, volumen, duración por defecto), `useSoundsStore`, `useBackgroundsStore`, `useStatsStore`, `useAuthStore`, `useHomeStore`.
+
+`useHomeStore` (2026-09-19) guarda **estado de interfaz** de Home, no preferencias: hoy solo si la card de opciones está plegada. Está en un store porque `<RouterView>` destruye la vista al navegar.
+
+**Un store sirve para dos cosas distintas:** compartir entre componentes, y sobrevivir al desmontaje. Un valor que nadie más lee puede necesitar uno igual, por lo segundo. (La alternativa, `<KeepAlive>` sobre el `<RouterView>`, conserva todo el estado de la vista pero también lo que sí debería reiniciarse. No se tomó.)
+
+### 7.2.1 Banderas de un store que lee datos (convención, 2026-09-19)
+
+`loaded` (hubo lectura exitosa), `loadFailed`, `saveFailed`, y `canEdit` derivada de `loaded`.
+
+**Regla dura: no se escribe sin haber leído con éxito.** Si `load()` falla, el store queda con los defaults en memoria mientras los reales siguen guardados, y cualquier `persist()` los pisa en silencio. Todas las acciones arrancan con `if (!canEdit.value) return`. Eso cubre también el arranque, antes de que `load()` responda.
+
+La vista tiene que mostrarlo y apagar el cuerpo: dejarlo interactivo hace que el usuario toque cosas que no pasan nada.
 
 ### 7.3 Los stores no hablan con el backend directamente
 
@@ -283,6 +312,10 @@ Acompañar siempre la notificación con un beep corto: la notificación visual s
 
 Clases directo en el template. Evitar `@apply` salvo repetición real y probada.
 
+**Tercera trampa, medida el 2026-09-19:** `scale-*`, `translate-*` y `rotate-*` escriben sus propias propiedades CSS, no `transform`. Entonces `transition-[opacity,transform]` **no anima la escala**: salta en el primer fotograma mientras la opacidad sí se desvanece, y se lee como animación a tirones. Va `transition-[opacity,scale]`.
+
+**Cuarta:** dos clases del mismo grupo en un elemento no se resuelven por el orden del atributo. En `class="bg-red-600 bg-surface-elevated"` gana la que esté más abajo en el CSS generado, que decide Tailwind. Se reemplaza, no se agrega.
+
 ---
 
 ## 10. Router
@@ -300,6 +333,19 @@ Clases directo en el template. Evitar `@apply` salvo repetición real y probada.
 - Nombre: `<archivo>.spec.ts`.
 - **Prioridad: `useTimer`.** Es lógica pura, es el corazón de la app, y es donde un error se nota tarde. Probar: pausa/reanudación, cruce del umbral sin detenerse, y marcas salteadas de los recordatorios.
 - No perseguir cobertura. Probar lo que duele si se rompe.
+- **Al 2026-09-19 no hay ni un test.** `npm run test:unit -- --run` falla con "No test files found, exiting with code 1". No es una falla del código.
+
+### 11.1 Cómo ver los estados a mano (2026-09-19)
+
+Vue DevTools, pestaña de la piña, edita el estado de cualquier store (el icono cuadrado al lado del valor; los tres puntos solo copian). O desde la consola, con `if (import.meta.env.DEV) Object.assign(window, { $pinia: pinia })` en `main.ts`:
+
+```js
+$pinia.state.value.settings.loadFailed = true                   // cualquier store, por su nombre
+Storage.prototype.setItem = () => { throw new Error('test') }   // saveFailed de verdad
+Storage.prototype.getItem = () => { throw new Error('test') }   // loadFailed, y recargar
+```
+
+**El `loadFailed` de los catálogos no se puede provocar desde el navegador:** son un `.json` que Vite incrusta al compilar, no hay API que romper. Para esos hace falta una implementación de `api/` que tire error.
 
 ---
 

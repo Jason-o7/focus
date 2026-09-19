@@ -160,6 +160,17 @@ Decidido por Jason. No abre una ventana aparte: aparece como una fila arriba de 
 - **Cuando el 20-20-6 dispara, la card se abre sola.** Si el usuario la vuelve a plegar con el aviso sin leer, queda un punto celeste sobre la burbuja. El punto se va al cerrar el aviso.
 - Intervalos ofrecidos: 10, 15 y 20 minutos, más un chip `+` para que el usuario agregue el suyo.
 
+### 3.6.1 Decidido al implementar la card en Vue (2026-09-19)
+
+- **Los intervalos del 20-20-6 son dato del usuario, no una constante.** El chip `+` deja agregar los propios, así que la lista no es fija: viajan en `Settings`. **Criterio general: si el usuario lo puede tocar, es dato.**
+- **Rango 1 a 60 minutos**, en `utils/eyeBreak.ts`, aplicado en el store (lo que elige el usuario) y en el dto (`localStorage` se edita desde DevTools, y mañana eso llega del backend).
+- **No se puede borrar el último intervalo.** Si se borra el seleccionado, `eyeBreakMinutes` salta al primero que queda: el valor guardado siempre coincide con un chip en pantalla.
+- **Icono de información** al lado de "A break for your eyes": se abre por hover **y** por click, y el click decide qué pasa cuando el mouse se va. Flota anclado al icono, no empuja la card; un click afuera lo cierra.
+- **La elección de sonido vive en `settings`, no en `sounds`.** `sounds` es el catálogo (qué existe), `settings` es cuál elegiste.
+- **El plegado de la card es estado de interfaz**, en `useHomeStore`. Sobrevive a navegar y volver, no a recargar. Guardarlo en `Settings` abriría una decisión sin tomar: qué gana al entrar con una sesión corriendo, lo guardado o el plegado automático.
+- **La animación de plegar no anima el tamaño**, cruza dos elementos con opacidad y escala. Animar el ancho reflowea el contenido: al expandir, el cuerpo aparecía a 56 px y el texto se envolvía en una columna altísima.
+- **Falta:** avisar cuando se rechaza un intervalo inválido, reintentar sin recargar, y un punto de aviso sobre la burbuja (plegada, los errores no se ven).
+
 ### 3.7 Estados de Home que faltan diseñar
 
 Decidido por Jason el 2026-09-17: **se resuelven después de la implementación inicial en Vue**, no antes. Motivo: casi todos son la misma pantalla con una condición distinta. En HTML suelto cada uno es un marco duplicado que se desactualiza; en Vue es una bandera.

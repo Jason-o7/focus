@@ -2,7 +2,7 @@
 
 > **Lector previsto:** una instancia de Claude sin contexto previo. Jason casi no lee estos archivos.
 > **Este es el único archivo que se lee al inicio de cada conversación.** Los demás, solo bajo demanda (§0).
-> **Fecha de la última revisión:** 2026-09-17.
+> **Fecha de la última revisión:** 2026-09-19.
 > Si una instrucción directa de Jason en la conversación contradice este archivo, gana Jason.
 
 ---
@@ -24,7 +24,7 @@
 | Archivo | Qué contiene | Leerlo cuando | NO leerlo si |
 |---|---|---|---|
 | `proyecto.md` | Este. Producto, fases, modelo de datos compartido, decisiones abiertas. | Siempre, al inicio. | — |
-| `frontend-arquitectura.md` | Estructura de carpetas, stack con versiones, dónde va cada archivo, capa `api/`, mecanismos del reloj y el audio, Tailwind, tests, comandos verificados. | Antes de escribir o modificar **cualquier cosa** dentro de `focus_front`. | La tarea es de backend, despliegue, producto o diseño. |
+| `frontend-arquitectura.md` | Estructura de carpetas, stack con versiones, dónde va cada archivo, capa `api/`, mecanismos del reloj y el audio, Tailwind, tests, comandos verificados. | Antes de escribir o modificar **cualquier cosa** dentro de `focus_front`. | La tarea es de backend, despliegue, producto o diseño. **Ojo: 404 líneas, viola D3. Hay que partirlo.** |
 | `backend-arquitectura.md` | Nest 12 (ESM, Vitest, oxlint) con versiones y trampas verificadas, estructura medida en 16 repos reales, dónde va cada archivo, auth, mecanismos de datos probados (UUID, importación idempotente, día local), migraciones, decisiones abiertas del backend. **Todo sin confirmar por Jason.** | Antes de generar o modificar **cualquier cosa** dentro de `focus_back`, o al discutir Postgres vs MySQL, ORM o dónde guardar el JWT. | La tarea es solo de front, producto o diseño. |
 | `despliegue-aws.md` | Cómo despliegan las empresas en AWS: encuestas, conteo en GitHub, seis patrones, servicios cerrados (App Runner, Copilot), rollback, OIDC, Free Plan, precios medidos en us-east-1 y sa-east-1, latencia desde Sucre, opciones A-D para Focus. **Nada decidido.** | Se discute **dónde o cómo desplegar**, costos de AWS, CORS vs mismo dominio, o dónde guardar el JWT (A4 del back depende de esto). | La tarea es escribir código de front o back. |
 | `flujo-pantallas.md` | Qué pantallas existen, qué hace cada una, desde dónde se llega a cada una, estados de Home y diálogos sueltos. No cubre diseño visual. | Se toca la navegación, el router, o se crea o modifica una vista. | La tarea es de backend o despliegue. |
@@ -95,17 +95,20 @@ Al quitar el MVP estas exclusiones dejaron de valer, pero **nada entra automáti
 | 2 | Backend Nest + JWT + login. Unirlo al front. Desplegar. | Sin empezar |
 | 3 | Sin definir. Se decide al llegar. | — |
 
-**Estado del código al 2026-09-17:** `focus_front/` generado con create-vue, limpio de ejemplos, Tailwind 4 instalado y conectado a Vite. `views/timer/TimerView.vue` existe vacío; el router tiene `routes: []`. `focus_back/` sin generar.
+**Estado del código al 2026-09-19:**
 
-### Siguiente paso (acordado el 2026-09-17)
-
-**Diseño visual de las pantallas**, en otra conversación. Producto, emociones y flujo ya están cerrados; falta cómo se ve cada pantalla, incluida la navegación entre ellas y la temática visual de Estadísticas. Material de entrada: `flujo-pantallas.md`, `emociones.md` §4 y `frontend-arquitectura.md` §9 (Tailwind 4, sin `tailwind.config.js`). Jason quiere copiar flujo y diseño de apps exitosas, y pidió un tema oscuro azul.
+- Maqueta completa de Home en `docs/mockups/home.html`, dos marcos de 1440×900 (inactivo y corriendo). Es la referencia de lo que falta construir.
+- `focus_front/`: tema en `assets/main.css` (`@theme`, 13 tokens + Outfit/Space Mono), sidebar con plegado e indicador deslizante, router con tres rutas (`home`, `stats`, `settings`).
+- **Dominio `settings` completo de punta a punta:** `types/` → `api/types.ts` → `api/dto.ts` → `api/local/` → `stores/` → `views/home/SettingsCard.vue`. Incluye catálogos de sonidos y fondos, estados de carga y error, y validación en los dos bordes.
+- `StatsView` y `SettingsView` existen vacías, solo para probar la navegación.
+- **Falta todo el resto de Home:** modo, reloj, duraciones, botón de acción, racha, meta, mascota, overlay de duración.
+- `focus_back/` sin generar. Cero tests.
 
 ### Flujo de pantallas
 
 Está en `flujo-pantallas.md` (pantallas, transiciones, estados de Home). Acá solo lo que no es flujo:
 
-- **Home** = temporizador y cronómetro; el archivo hoy es `views/timer/TimerView.vue` (renombrar o no, sin decidir).
+- **Home** = temporizador y cronómetro; el archivo es `views/home/HomeView.vue`, renombrado desde `views/timer/TimerView.vue` el 2026-09-17.
 - **Sonidos:** "uno por defecto y el resto deshabilitado" se decidió para el MVP; con el MVP quitado, REABIERTO.
 - **Emociones y motivación:** `emociones.md`, con los 11 puntos ya cerrados.
 - **Temática visual** (tipo plantas de Forest): vive en Estadísticas. Jason quiere copiar flujo y diseño de apps exitosas.
@@ -122,6 +125,17 @@ Está en `flujo-pantallas.md` (pantallas, transiciones, estados de Home). Acá s
 - **Dónde se suman las estadísticas:** en la base con `GROUP BY`, no en el navegador. Con miles de sesiones no conviene bajarlas todas.
 - **Sonidos:** `sounds(id, nombre, url, user_id NULL)`. `user_id = NULL` significa "por defecto". La regla "no se editan ni borran los por defecto" sale sola: permitir solo si `sound.user_id === usuario.id`. Dejar la columna desde el inicio aunque la funcionalidad sea futura; agregarla después obliga a migrar.
 - **Migración de la fase 1 a la 2:** endpoint `POST /sessions/import` que recibe el array completo. El front pregunta antes de subir y **limpia `localStorage` recién después de confirmar que subieron**.
+
+**Qué pasa con lo configurado sin cuenta (propuesta de Jason, 2026-09-19, sin confirmar):**
+
+| Momento | Settings | Sesiones de estudio |
+|---|---|---|
+| **Crear cuenta** | se suben | se suben |
+| **Login de cuenta existente** | gana el servidor, se descarta lo local | **nunca se descartan**, se importan |
+
+Crear cuenta no es una política: el servidor está vacío, no hay conflicto. El login sí es una decisión, con un caso incómodo: tener cuenta, usar otra computadora sin loguearse, configurar, loguearse, y perder eso.
+
+**Las dos columnas no pueden tener la misma regla:** perder un fondo elegido cuesta volver a elegirlo; perder 40 horas de estudio hace cerrar la app.
 
 ---
 

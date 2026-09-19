@@ -4,6 +4,7 @@ export interface Settings {
   backgroundId: string
   eyeBreakEnabled: boolean
   eyeBreakMinutes: number
+  eyeBreakPresets: number[]
 }
 
 export const DEFAULT_SETTINGS: Settings = {
@@ -11,4 +12,5 @@ export const DEFAULT_SETTINGS: Settings = {
   backgroundId: 'dusk',
   eyeBreakEnabled: true,
   eyeBreakMinutes: 20,
+  eyeBreakPresets: [10, 15, 20],
 }
