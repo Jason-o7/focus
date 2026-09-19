@@ -101,7 +101,9 @@ Al quitar el MVP estas exclusiones dejaron de valer, pero **nada entra automáti
 - `focus_front/`: tema en `assets/main.css` (`@theme`, 13 tokens + Outfit/Space Mono), sidebar con plegado e indicador deslizante, router con tres rutas (`home`, `stats`, `settings`).
 - **Dominio `settings` completo de punta a punta:** `types/` → `api/types.ts` → `api/dto.ts` → `api/local/` → `stores/` → `views/home/SettingsCard.vue`. Incluye catálogos de sonidos y fondos, estados de carga y error, y validación en los dos bordes.
 - `StatsView` y `SettingsView` existen vacías, solo para probar la navegación.
-- **Falta todo el resto de Home:** modo, reloj, duraciones, botón de acción, racha, meta, mascota, overlay de duración.
+- **Mascota en Home (2026-09-19).** `components/PetCompanion.vue` con props `state`, `size` y `mirror`. El mapa estado → imagen son imports de Vite, sin store ni repositorio: la imagen no cambia por usuario, así que es un asset. Tres poses en `assets/pet/*.webp` (~211 KB en total); los PNG maestros quedan en `assets/pet/master/` y nadie los importa. `HomeView` traduce `TimerStatus` a `PetState`.
+- **`stores/timer.ts` a medias.** Solo `status` (`stopped` / `running` / `paused`) con `start`, `pause`, `resume`, `stop`. **Falta el motor del reloj** de `frontend-arquitectura.md` §7.4: nada cuenta tiempo todavía. Y nada dispara las transiciones, porque no hay botón de acción. Para ver las poses hay que editar el store desde Vue DevTools.
+- **Falta el resto de Home:** modo, reloj, duraciones, botón de acción, racha, meta, overlay de duración.
 - `focus_back/` sin generar. Cero tests.
 
 ### Flujo de pantallas

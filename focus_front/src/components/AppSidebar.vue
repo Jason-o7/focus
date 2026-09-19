@@ -9,7 +9,7 @@ defineProps<{
 
 const route = useRoute()
 
-// NOTE: must match the order of the items in the template below.
+// ! must match the order of the items in the template below.
 const ORDER = ['home', 'stats', 'settings']
 
 // Item height (h-11) plus gap (gap-1).

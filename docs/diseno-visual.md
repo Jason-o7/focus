@@ -73,9 +73,22 @@ Reglas de producto que ya estaban cerradas y la condicionan (`emociones.md` §3.
 
 ### 3.1 La imagen base
 
-Elegida por Jason el 2026-09-17, generada con IA. Guardada en `focus_front/src/assets/pet/base.png`: 1024 px, fondo transparente. Es el archivo maestro, no se recorta ni se escala.
+Elegida por Jason el 2026-09-17, generada con IA. Un robot con cuerpo de televisor antiguo.
 
-Un robot con cuerpo de televisor antiguo. Cuerpo gris azulado `#B8CBD6`, contorno azul profundo `#2D4070`, pantalla `#1A2744`, ojos y perilla en naranja `#F59E0B`. Lleva contorno blanco propio y sombra, que es lo que la despega de cualquier fondo.
+**Estado al 2026-09-19.** Ya no existe `base.png`. Hay tres poses, cada una en dos formatos:
+
+| Estado (`types/pet.ts`) | Pose | Cuándo |
+|---|---|---|
+| `idle` | de pie | temporizador detenido |
+| `focusing` | sentada en su silla, mirando arriba | corriendo |
+| `waiting` | sentada, mirando al usuario | en pausa |
+
+- `focus_front/src/assets/pet/*.webp` — lo que consume el código. 1254 px, con alfa. 47-83 KB cada una.
+- `focus_front/src/assets/pet/master/*.png` — los maestros. Nadie los importa, así que Vite no los mete al bundle.
+- **Jason quitó el contorno blanco** que traía la primera versión. No le gustaba. Eso deja sin cumplir lo que pide §3.4 para los fondos animados.
+- `waiting.png` llegó con el damero de transparencia pintado adentro. Se le devolvió el alfa por relleno desde el borde (2026-09-19).
+
+Cuerpo gris azulado `#B8CBD6`, contorno azul profundo `#2D4070`, pantalla `#1A2744`, ojos y perilla en naranja `#F59E0B`. Las dos poses sentadas traen además una silla azul con luces cian.
 
 Defectos conocidos, aceptados por ahora y sin corregir:
 
@@ -95,7 +108,7 @@ Defectos conocidos, aceptados por ahora y sin corregir:
 
 ### 3.3 Las demás poses
 
-Se generan **usando `base.png` como imagen de referencia**, nunca desde cero: es lo único que mantiene al mismo personaje entre generaciones. Cuanto menos detalle anatómico, menos se rompe.
+Se generan **usando una pose ya aceptada como imagen de referencia**, nunca desde cero: es lo único que mantiene al mismo personaje entre generaciones. Cuanto menos detalle anatómico, menos se rompe.
 
 Estados previstos, que salen de `flujo-pantallas.md` §3: inactiva, corriendo, meta cumplida, aviso 20-20-6.
 
