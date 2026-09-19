@@ -1,0 +1,1179 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Focus — Home mockup</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700&family=Space+Mono:wght@400;700&display=swap" rel="stylesheet">
+<style>
+  /* ------------------------------------------------------------------
+     Tokens. Mismos valores que docs/diseno-visual.md §1.
+     Cuando se escriba la app de verdad, esto va a @theme en Tailwind 4.
+     ------------------------------------------------------------------ */
+  :root {
+    --background: #0F1A30;
+    --surface: #1A2744;
+    --surface-elevated: #243559;
+    --border: #2D4070;
+    --text-primary: #F0EDE6;
+    --text-secondary: #8DAAB8;
+    --text-muted: #6A90A6;
+    --accent: #F59E0B;
+    --accent-hover: #FBBF24;
+    --accent-soft: #1C1F38;
+    --success: #52B894;
+    --info: #45B5D4;
+    --danger: #FC8181;
+
+    --sidebar-w: 240px;
+    --ease: cubic-bezier(0.4, 0, 0.2, 1);
+  }
+
+  /* Chrome de la maqueta. No es parte del diseño. */
+  body {
+    margin: 0;
+    padding: 64px 0 96px;
+    background: #070A12;
+    font-family: 'Outfit', sans-serif;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 200px;
+  }
+  .frame-wrap { width: 1440px; }
+  .frame-label {
+    font-size: 12px;
+    font-weight: 500;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: #5A6474;
+    margin-bottom: 12px;
+  }
+  .frame-label em {
+    font-style: normal;
+    color: #3D4654;
+    text-transform: none;
+    letter-spacing: 0;
+  }
+
+  /* ------------------------------------------------------------------
+     El marco. 1440x900 exactos.
+     .is-collapsed en el marco = sin sidebar: el área de contenido pasa
+     de 240..1440 a 0..1440 y la columna central se recentra.
+     ------------------------------------------------------------------ */
+  .frame {
+    position: relative;
+    width: 1440px;
+    height: 900px;
+    background: var(--background);
+    overflow: hidden;
+    color: var(--text-primary);
+  }
+
+  /* --- Sidebar --- */
+  .sidebar {
+    position: absolute;
+    left: 0; top: 0;
+    width: var(--sidebar-w); height: 900px;
+    background: var(--surface);
+    border-right: 1px solid var(--border);
+    box-sizing: border-box;
+    transition: transform .28s var(--ease), opacity .2s var(--ease);
+  }
+  .is-collapsed .sidebar {
+    transform: translateX(calc(var(--sidebar-w) * -1));
+    opacity: 0;
+  }
+  .brand {
+    position: absolute;
+    left: 32px; top: 28px;
+    margin: 0;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    font-size: 32px; font-weight: 700;
+    letter-spacing: -0.02em;
+  }
+  /* Hueco reservado para el ícono de la app, que todavía no existe. */
+  .brand .logo-slot {
+    width: 40px; height: 40px;
+    flex: none;
+    border-radius: 10px;
+    border: 1px dashed var(--border);
+  }
+  .nav { position: absolute; left: 16px; top: 120px; width: 208px; }
+  .nav a {
+    position: relative;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    height: 44px;
+    padding: 0 14px;
+    border-radius: 10px;
+    text-decoration: none;
+    font-size: 15px;
+    color: var(--text-secondary);
+  }
+  .nav a + a { margin-top: 4px; }
+  .nav a.is-selected {
+    background: var(--surface-elevated);
+    color: var(--text-primary);
+  }
+  /* El acento marca el ítem activo con una barra fina, no con relleno:
+     el único elemento lleno de acento es el botón principal. */
+  .nav a.is-selected::before {
+    content: '';
+    position: absolute;
+    left: -16px; top: 12px;
+    width: 3px; height: 20px;
+    border-radius: 0 3px 3px 0;
+    background: var(--accent);
+  }
+  .nav svg { width: 18px; height: 18px; flex: none; }
+
+  /* --- Botón de plegar y desplegar el sidebar. Nada lo tapa. --- */
+  .sidebar-toggle {
+    position: absolute;
+    left: 264px; top: 24px;
+    width: 40px; height: 40px;
+    display: flex; align-items: center; justify-content: center;
+    padding: 0;
+    border-radius: 10px;
+    border: 1px solid var(--border);
+    background: var(--surface);
+    color: var(--text-secondary);
+    cursor: pointer;
+    transition: left .28s var(--ease);
+    z-index: 2;
+  }
+  .is-collapsed .sidebar-toggle { left: 24px; }
+  .sidebar-toggle:hover { color: var(--text-primary); }
+  .sidebar-toggle svg { width: 18px; height: 18px; }
+
+  /* --- Panel de sonido y fondo: abajo a la izquierda, por fuera
+         del sidebar. Se corre con él. --- */
+  .settings {
+    position: absolute;
+    left: 272px; bottom: 24px;
+    width: 304px;
+    box-sizing: border-box;
+    padding: 16px 18px 18px;
+    background: var(--surface-elevated);
+    border: 1px solid var(--border);
+    border-radius: 14px;
+    transition: left .28s var(--ease), width .22s var(--ease), border-radius .22s var(--ease);
+  }
+  .is-collapsed .settings { left: 24px; }
+
+  /* ------------------------------------------------------------------
+     La card se pliega en burbuja. Ancla en la misma esquina, así que
+     al abrirse crece hacia arriba y hacia la derecha, sin tapar nada.
+     ------------------------------------------------------------------ */
+  .card-collapse {
+    position: absolute;
+    right: 12px; top: 12px;
+    width: 26px; height: 26px;
+    display: flex; align-items: center; justify-content: center;
+    padding: 0;
+    border: 0;
+    border-radius: 7px;
+    background: transparent;
+    color: var(--text-muted);
+    cursor: pointer;
+  }
+  .card-collapse:hover { color: var(--text-primary); background: var(--surface); }
+  .card-collapse svg { width: 14px; height: 14px; }
+
+  .bubble {
+    display: none;
+    width: 56px; height: 56px;
+    align-items: center;
+    justify-content: center;
+    padding: 0;
+    border: 0;
+    border-radius: 50%;
+    background: transparent;
+    color: var(--text-secondary);
+    cursor: pointer;
+  }
+  .bubble:hover { color: var(--text-primary); }
+  .bubble svg { width: 22px; height: 22px; }
+  /* Punto de aviso: queda si plegaste la card con el 20-20-6 pendiente. */
+  .bubble .dot {
+    position: absolute;
+    right: 12px; top: 12px;
+    width: 9px; height: 9px;
+    border-radius: 50%;
+    background: var(--info);
+    border: 2px solid var(--surface-elevated);
+    box-sizing: border-box;
+  }
+  .bubble .dot[hidden] { display: none; }
+
+  .settings.is-bubble {
+    width: 56px;
+    padding: 0;
+    border-radius: 50%;
+  }
+  .settings.is-bubble .card-body,
+  .settings.is-bubble .card-collapse { display: none; }
+  .settings.is-bubble .bubble { display: flex; }
+  /* La palabra que distingue una fila de la otra va en texto primario.
+     En versalitas y todo en tenue, "hear" y "see" se perdían. */
+  .settings .row-label {
+    font-size: 14px;
+    color: var(--text-muted);
+    margin-bottom: 10px;
+  }
+  .settings .row-label b {
+    font-weight: 600;
+    font-size: 15px;
+    color: var(--text-primary);
+  }
+  .settings .row + .row { margin-top: 18px; }
+  .settings .row-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    margin-bottom: 10px;
+  }
+  .settings .row-head .row-label { margin-bottom: 0; }
+
+  /* --- Interruptor. Checkbox real debajo, para que funcione con
+         teclado y con lector de pantalla. --- */
+  .switch { position: relative; display: inline-flex; flex: none; cursor: pointer; }
+  .switch input {
+    position: absolute;
+    inset: 0;
+    margin: 0;
+    opacity: 0;
+    cursor: pointer;
+  }
+  .switch .track {
+    width: 44px; height: 24px;
+    box-sizing: border-box;
+    border-radius: 999px;
+    /* Apagado: hueco oscuro con el perno claro. Se lee como un
+       interruptor bajado, no como un pill descolorido. */
+    background: var(--background);
+    border: 1px solid var(--border);
+    transition: background .18s var(--ease), border-color .18s var(--ease);
+  }
+  .switch .knob {
+    display: block;
+    width: 16px; height: 16px;
+    margin: 3px;
+    border-radius: 50%;
+    background: var(--text-secondary);
+    transition: transform .18s var(--ease), background .18s var(--ease);
+  }
+  .switch:hover .track { border-color: var(--text-muted); }
+  .switch input:checked + .track {
+    background: var(--accent);
+    border-color: var(--accent);
+  }
+  .switch input:checked + .track .knob {
+    transform: translateX(20px);
+    background: var(--background);
+  }
+  .switch input:focus-visible + .track { box-shadow: 0 0 0 2px var(--accent); }
+
+  /* Apagado: las opciones de intervalo siguen visibles pero muertas.
+     Esconderlas movería la card entera cada vez que se toca el switch. */
+  .chips.is-off { opacity: .35; pointer-events: none; }
+
+  /* El chip de agregar: borde punteado, para que no se confunda con
+     un intervalo que ya existe. */
+  .chip-add {
+    border-style: dashed;
+    background: transparent;
+    color: var(--text-muted);
+    font-size: 15px;
+    line-height: 1;
+    padding: 8px 14px;
+  }
+
+  .sr-only {
+    position: absolute;
+    width: 1px; height: 1px;
+    padding: 0; margin: -1px;
+    overflow: hidden;
+    clip: rect(0 0 0 0);
+    white-space: nowrap;
+    border: 0;
+  }
+
+  /* --- Aviso 20-20-6. Vive dentro de esta card, no en una ventana
+         aparte: el reloj no se detiene, así que no puede tapar nada.
+         Usa el token celeste, que es informativo, no de peligro. --- */
+  .eye-notice {
+    display: flex;
+    align-items: flex-start;
+    gap: 10px;
+    margin-bottom: 18px;
+    padding: 12px 12px 12px 14px;
+    border-radius: 10px;
+    background: rgba(69, 181, 212, 0.10);
+    border: 1px solid rgba(69, 181, 212, 0.45);
+  }
+  .eye-notice[hidden] { display: none; }
+  .eye-notice svg { width: 18px; height: 18px; flex: none; color: var(--info); margin-top: 1px; }
+  .eye-notice .body { flex: 1; font-size: 13px; line-height: 1.45; color: var(--text-secondary); }
+  .eye-notice .body b { color: var(--text-primary); font-weight: 600; }
+  .eye-notice .dismiss {
+    flex: none;
+    width: 22px; height: 22px;
+    display: flex; align-items: center; justify-content: center;
+    padding: 0;
+    border: 0;
+    border-radius: 6px;
+    background: transparent;
+    color: var(--text-muted);
+    cursor: pointer;
+  }
+  .eye-notice .dismiss:hover { color: var(--text-primary); }
+  .eye-notice .dismiss svg { width: 13px; height: 13px; color: currentColor; }
+  .chips { display: flex; flex-wrap: wrap; gap: 8px; }
+  .chip {
+    font-family: inherit;
+    font-size: 13px;
+    line-height: 1;
+    padding: 9px 12px;
+    border-radius: 999px;
+    border: 1px solid var(--border);
+    /* Relleno propio: sobre superficie-elevada un pill transparente
+       desaparece y no se lee como algo que se puede tocar. */
+    background: var(--surface);
+    color: var(--text-secondary);
+    cursor: pointer;
+  }
+  .chip:hover { color: var(--text-primary); border-color: var(--text-muted); }
+  .chip.is-selected {
+    background: var(--accent-soft);
+    border-color: var(--accent);
+    color: var(--accent);
+  }
+  .thumbs { display: flex; gap: 10px; }
+  .thumb {
+    width: 56px; height: 56px;
+    border-radius: 10px;
+    border: 1px solid var(--border);
+    background: var(--surface);
+    padding: 0;
+    cursor: pointer;
+  }
+  .thumb.is-selected { border-color: var(--accent); }
+
+  /* --- Racha y meta del día, centradas sobre el área de contenido. --- */
+  .streak {
+    position: absolute;
+    left: var(--sidebar-w); top: 24px;
+    width: calc(1440px - var(--sidebar-w));
+    text-align: center;
+    transition: left .28s var(--ease), width .28s var(--ease);
+  }
+  .is-collapsed .streak { left: 0; width: 1440px; }
+  .streak .badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 12px;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--text-muted);
+  }
+  /* La llama solo aparece con racha mayor a 5. Ver el script. */
+  .streak .badge svg { width: 14px; height: 14px; color: var(--accent); }
+  .streak .badge svg[hidden] { display: none; }
+
+  /* La meta vive al final de la barra y el tiempo de hoy viaja con el
+     relleno. Así el progreso se lee por posición, no por una frase. */
+  .progress {
+    margin-top: 34px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 12px;
+  }
+  .progress-track {
+    position: relative;
+    width: 280px; height: 6px;
+    border-radius: 3px;
+    background: var(--border);
+  }
+  .progress-fill {
+    width: 62.5%; height: 100%;
+    border-radius: 3px;
+    background: var(--accent);
+  }
+  /* Lo hecho va a la izquierda y en color de acento, igual que el
+     relleno: el número y la barra dicen lo mismo. La meta queda a la
+     derecha, apagada, porque todavía no pasó. */
+  .progress-now {
+    font-size: 15px;
+    font-weight: 600;
+    color: var(--accent);
+    white-space: nowrap;
+    min-width: 58px;
+    text-align: right;
+  }
+  .progress-goal {
+    font-size: 13px;
+    color: var(--text-muted);
+  }
+
+  /* --- Avatar. Fijo arriba a la derecha, no se mueve nunca. --- */
+  .avatar {
+    position: absolute;
+    left: 1376px; top: 24px;
+    width: 40px; height: 40px;
+    padding: 0;
+    border-radius: 50%;
+    border: 1px solid var(--border);
+    background: var(--surface-elevated);
+    overflow: hidden;
+    cursor: pointer;
+  }
+  .avatar svg { display: block; width: 40px; height: 40px; }
+
+  /* ------------------------------------------------------------------
+     Columna central. Cada pieza va a una altura fija, no apilada:
+     así el RELOJ queda siempre centrado vertical (402 + 96/2 = 450),
+     y quitar el selector o las duraciones no mueve nada.
+     Horizontalmente la columna se centra sobre el área de contenido.
+     ------------------------------------------------------------------ */
+  .center-col {
+    position: absolute;
+    left: var(--sidebar-w); top: 0;
+    width: calc(1440px - var(--sidebar-w)); height: 900px;
+    transition: left .28s var(--ease), width .28s var(--ease);
+    pointer-events: none;
+  }
+  .is-collapsed .center-col { left: 0; width: 1440px; }
+  .center-col > * {
+    position: absolute;
+    left: 50%;
+    transform: translateX(-50%);
+    pointer-events: auto;
+  }
+
+  .mode {
+    top: 345px;
+    width: 260px; height: 40px;
+    box-sizing: border-box;
+    display: flex;
+    padding: 4px;
+    border-radius: 10px;
+    background: var(--surface);
+    border: 1px solid var(--border);
+  }
+  .mode button {
+    flex: 1;
+    font-family: inherit;
+    font-size: 14px;
+    border: 0;
+    border-radius: 7px;
+    background: transparent;
+    color: var(--text-muted);
+    cursor: pointer;
+  }
+  .mode button.is-selected {
+    background: var(--surface-elevated);
+    color: var(--text-primary);
+  }
+
+  .clock {
+    top: 402px;
+    font-family: 'Space Mono', monospace;
+    font-size: 80px;
+    line-height: 96px;
+    letter-spacing: 0.04em;
+    color: var(--text-primary);
+    white-space: nowrap;
+  }
+
+  /* --- Las dos duraciones. Cualquiera de las dos abre el mismo
+         overlay, con esa ya elegida. --- */
+  .durations {
+    top: 515px;
+    height: 44px;
+    display: flex;
+    gap: 12px;
+  }
+  .durations[data-hidden='true'] { visibility: hidden; }
+  .duration {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    height: 44px;
+    padding: 0 16px;
+    border-radius: 999px;
+    background: transparent;
+    border: 1px solid var(--border);
+    color: var(--text-secondary);
+    font-family: inherit;
+    font-size: 14px;
+    cursor: pointer;
+  }
+  .duration:hover { border-color: var(--text-muted); color: var(--text-primary); }
+  .duration .label {
+    font-size: 12px;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--text-muted);
+  }
+  .duration .value {
+    font-family: 'Space Mono', monospace;
+    font-size: 16px;
+    color: var(--text-primary);
+  }
+
+  .action-slot {
+    top: 587px;
+    width: 200px; height: 52px;
+    display: flex;
+    gap: 8px;
+  }
+  .btn {
+    font-family: inherit;
+    font-size: 15px;
+    font-weight: 500;
+    border-radius: 12px;
+    cursor: pointer;
+    border: 1px solid transparent;
+  }
+  .btn-primary {
+    flex: 1;
+    background: var(--accent);
+    color: #1A1204;
+  }
+  .btn-primary:hover { background: var(--accent-hover); }
+  .btn-ghost {
+    flex: 1;
+    background: transparent;
+    border-color: var(--border);
+    color: var(--text-secondary);
+  }
+  .btn-ghost:hover { color: var(--text-primary); border-color: var(--text-muted); }
+
+  /* --- Hueco de la mascota. Sin borde, sin tarjeta, sin panel. --- */
+  .mascot {
+    position: absolute;
+    left: 1212px; top: 652px;
+    width: 180px; height: 200px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    text-align: center;
+    border-radius: 12px;
+    background: rgba(26, 39, 68, 0.4);
+    font-size: 12px;
+    color: var(--text-muted);
+  }
+
+  /* ------------------------------------------------------------------
+     Overlay de duración. Uno solo para Focus y Break.
+     Sin aceptar ni cancelar: cada cambio se aplica al instante.
+     Se cierra con la X, con clic afuera o con Esc.
+     ------------------------------------------------------------------ */
+  .overlay {
+    position: absolute;
+    inset: 0;
+    background: rgba(7, 10, 18, 0.72);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 10;
+  }
+  .overlay[hidden] { display: none; }
+  .sheet {
+    position: relative;
+    width: 520px;
+    box-sizing: border-box;
+    padding: 28px 32px 24px;
+    background: var(--surface-elevated);
+    border: 1px solid var(--border);
+    border-radius: 18px;
+  }
+  .sheet h2 {
+    margin: 0 0 20px;
+    font-size: 20px; font-weight: 500;
+  }
+  .sheet-close {
+    position: absolute;
+    right: 20px; top: 20px;
+    width: 32px; height: 32px;
+    display: flex; align-items: center; justify-content: center;
+    padding: 0;
+    border-radius: 8px;
+    border: 1px solid transparent;
+    background: transparent;
+    color: var(--text-muted);
+    cursor: pointer;
+  }
+  .sheet-close:hover { color: var(--text-primary); border-color: var(--border); }
+  .sheet-close svg { width: 16px; height: 16px; }
+
+  .target {
+    display: flex;
+    padding: 4px;
+    gap: 4px;
+    border-radius: 10px;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    margin-bottom: 20px;
+  }
+  /* Los dos valores viven acá, en el propio selector: no hace falta
+     una frase abajo que repita lo mismo. */
+  .target button {
+    flex: 1;
+    height: 52px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 2px;
+    font-family: inherit;
+    border: 0;
+    border-radius: 8px;
+    background: transparent;
+    color: var(--text-muted);
+    cursor: pointer;
+  }
+  .target button .t-label {
+    font-size: 11px;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+  }
+  .target button .t-value {
+    font-family: 'Space Mono', monospace;
+    font-size: 15px;
+    color: var(--text-secondary);
+  }
+  .target button.is-selected {
+    background: var(--surface-elevated);
+    color: var(--text-primary);
+  }
+  .target button.is-selected .t-value { color: var(--text-primary); }
+
+  .presets { display: flex; gap: 8px; margin-bottom: 24px; }
+
+  .dial-wrap { display: flex; flex-direction: column; align-items: center; }
+  .dial {
+    position: relative;
+    width: 220px; height: 220px;
+    cursor: grab;
+    touch-action: none;
+    border-radius: 50%;
+    outline: none;
+  }
+  .dial:focus-visible { box-shadow: 0 0 0 2px var(--accent); }
+  .dial:active { cursor: grabbing; }
+  /* El agarre crece al acercar el mouse: es la pista de que se arrastra. */
+  .dial [data-handle] { transition: r .15s var(--ease); }
+  .dial:hover [data-handle] { r: 17; }
+  .dial svg { display: block; width: 220px; height: 220px; }
+  .dial-readout {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    pointer-events: none;
+  }
+  .dial-readout .num {
+    font-family: 'Space Mono', monospace;
+    font-size: 40px;
+    color: var(--text-primary);
+  }
+  .dial-readout .unit {
+    margin-top: 2px;
+    font-size: 12px;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--text-muted);
+  }
+
+</style>
+</head>
+<body>
+
+<!-- ================= FRAME 1 — HOME, INACTIVO ================= -->
+<div class="frame-wrap">
+  <div class="frame-label">Home — Idle <em>(el botón de arriba a la izquierda pliega el sidebar; Focus o Break abren el overlay)</em></div>
+  <div class="frame" id="frame-idle">
+
+    <nav class="sidebar">
+      <h1 class="brand"><span class="logo-slot" aria-hidden="true"></span>Focus</h1>
+      <div class="nav">
+        <a class="is-selected" href="#">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>
+          Home
+        </a>
+        <a href="#">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M4 20V10"/><path d="M10 20V4"/><path d="M16 20v-7"/><path d="M22 20H2"/></svg>
+          Your stats
+        </a>
+        <a href="#">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.6 1.6 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.6 1.6 0 0 0-2.7 1.1V21a2 2 0 1 1-4 0v-.1A1.6 1.6 0 0 0 7.4 19.4l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1A1.6 1.6 0 0 0 3 15a2 2 0 1 1 0-4 1.6 1.6 0 0 0 1.6-2.7l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1A1.6 1.6 0 0 0 10 3a2 2 0 1 1 4 0 1.6 1.6 0 0 0 2.7 1.6l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1A1.6 1.6 0 0 0 21 10a2 2 0 1 1 0 4 1.6 1.6 0 0 0-1.6 1z"/></svg>
+          Settings
+        </a>
+      </div>
+    </nav>
+
+    <button class="sidebar-toggle" type="button" data-toggle aria-label="Hide or show the menu">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M9 4v16"/></svg>
+    </button>
+
+    <div class="streak">
+      <div class="badge">
+        <svg data-flame viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2s5 4.5 5 9a5 5 0 0 1-10 0c0-1.5.6-2.8 1.4-3.8C8.8 8.6 9 10 10 10c1.2 0 1.4-1.6 1-3.2C10.6 5.2 12 2 12 2z"/><path d="M7 14a5 5 0 0 0 10 0"/></svg>
+        <span data-streak-text>12 days in a row</span>
+      </div>
+      <div class="progress">
+        <div class="progress-now" data-now>2h 30m</div>
+        <div class="progress-track">
+          <div class="progress-fill" data-fill></div>
+        </div>
+        <div class="progress-goal">4h</div>
+      </div>
+    </div>
+
+    <button class="avatar" type="button" aria-label="You">
+      <svg viewBox="0 0 40 40" fill="none"><circle cx="20" cy="20" r="20" fill="#243559"/><circle cx="20" cy="16" r="6.5" fill="#8DAAB8"/><path d="M6 40c0-7.7 6.3-12 14-12s14 4.3 14 12" fill="#8DAAB8"/></svg>
+    </button>
+
+    <section class="settings" aria-label="Session settings" data-card>
+      <button class="card-collapse" type="button" data-card-collapse aria-label="Hide options">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9l6 6 6-6"/></svg>
+      </button>
+      <button class="bubble" type="button" data-card-open aria-label="Show options">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"><path d="M4 8h10M18 8h2M4 16h4M12 16h8"/><circle cx="16" cy="8" r="2.2"/><circle cx="10" cy="16" r="2.2"/></svg>
+        <span class="dot" hidden></span>
+      </button>
+      <div class="card-body">
+      <div class="row">
+        <div class="row-label">Something to <b>hear</b></div>
+        <div class="chips">
+          <button class="chip is-selected" type="button">Rain</button>
+          <button class="chip" type="button">Fireplace</button>
+          <button class="chip" type="button">Forest</button>
+          <button class="chip" type="button">Cafe</button>
+          <button class="chip" type="button">Silence</button>
+        </div>
+      </div>
+      <div class="row">
+        <div class="row-label">Something to <b>see</b></div>
+        <div class="thumbs">
+          <button class="thumb is-selected" type="button" aria-label="Background 1"></button>
+          <button class="thumb" type="button" aria-label="Background 2"></button>
+          <button class="thumb" type="button" aria-label="Background 3"></button>
+        </div>
+      </div>
+      <div class="row">
+        <div class="row-head">
+          <div class="row-label">A break for your <b>eyes</b></div>
+          <label class="switch">
+            <input type="checkbox" checked data-eye-toggle>
+            <span class="track"><span class="knob"></span></span>
+            <span class="sr-only">Remind me to rest my eyes</span>
+          </label>
+        </div>
+        <div class="chips" data-eye-chips>
+          <button class="chip" type="button">10 min</button>
+          <button class="chip" type="button">15 min</button>
+          <button class="chip is-selected" type="button">20 min</button>
+          <button class="chip chip-add" type="button" data-eye-add aria-label="Add another interval">+</button>
+        </div>
+      </div>
+      </div>
+    </section>
+
+    <div class="center-col">
+      <div class="mode" data-mode>
+        <button type="button" class="is-selected" data-mode-timer>Timer</button>
+        <button type="button" data-mode-stopwatch>Stopwatch</button>
+      </div>
+
+      <div class="clock" data-clock>25:00</div>
+
+      <div class="durations" data-durations>
+        <button class="duration" type="button" data-open="focus">
+          <span class="label">Focus</span>
+          <span class="value" data-out="focus">25:00</span>
+        </button>
+        <button class="duration" type="button" data-open="break">
+          <span class="label">Break</span>
+          <span class="value" data-out="break">05:00</span>
+        </button>
+      </div>
+
+      <div class="action-slot">
+        <button class="btn btn-primary" type="button">Start focusing</button>
+      </div>
+    </div>
+
+    <div class="mascot">mascot — idle pose</div>
+
+    <!-- Overlay de duración -->
+    <div class="overlay" data-overlay hidden>
+      <div class="sheet" role="dialog" aria-modal="true" aria-label="Session length">
+        <button class="sheet-close" type="button" data-close aria-label="Close">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"/></svg>
+        </button>
+
+        <h2>How long this time?</h2>
+
+        <div class="target" data-target>
+          <button type="button" class="is-selected" data-target-focus>
+            <span class="t-label">Focus</span>
+            <span class="t-value" data-sheet-out="focus">25 min</span>
+          </button>
+          <button type="button" data-target-break>
+            <span class="t-label">Break</span>
+            <span class="t-value" data-sheet-out="break">5 min</span>
+          </button>
+        </div>
+
+        <div class="presets" data-presets></div>
+
+        <div class="dial-wrap">
+          <div class="dial" data-dial tabindex="0" role="slider"
+               aria-label="Minutes" aria-valuemin="5" aria-valuemax="120" aria-valuenow="25">
+            <svg viewBox="0 0 220 220">
+              <g data-ticks stroke="#456086" stroke-width="2" stroke-linecap="round"></g>
+              <circle cx="110" cy="110" r="88" fill="none" stroke="#2D4070" stroke-width="10"/>
+              <circle cx="110" cy="110" r="88" fill="none" stroke="#F59E0B" stroke-width="10"
+                      stroke-linecap="round" transform="rotate(-90 110 110)"
+                      data-arc stroke-dasharray="552.92" stroke-dashoffset="440"/>
+              <circle cx="110" cy="22" r="14" fill="#0F1A30" stroke="#F59E0B" stroke-width="3" data-handle/>
+              <circle cx="110" cy="22" r="4" fill="#F59E0B" data-handle-dot/>
+            </svg>
+            <div class="dial-readout">
+              <div class="num" data-dial-num>25</div>
+              <div class="unit">minutes</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<!-- ================= FRAME 2 — HOME, CORRIENDO ================= -->
+<div class="frame-wrap">
+  <div class="frame-label">Home — Running <em>(con el aviso 20-20-6 disparado dentro de la card)</em></div>
+  <div class="frame is-collapsed">
+
+    <section class="settings is-bubble" aria-label="Session settings" data-card>
+      <button class="card-collapse" type="button" data-card-collapse aria-label="Hide options">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9l6 6 6-6"/></svg>
+      </button>
+      <button class="bubble" type="button" data-card-open aria-label="Show options">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"><path d="M4 8h10M18 8h2M4 16h4M12 16h8"/><circle cx="16" cy="8" r="2.2"/><circle cx="10" cy="16" r="2.2"/></svg>
+        <span class="dot"></span>
+      </button>
+      <div class="card-body">
+      <div class="eye-notice" role="status">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M2 12s3.6-6 10-6 10 6 10 6-3.6 6-10 6-10-6-10-6z"/><circle cx="12" cy="12" r="2.6"/></svg>
+        <div class="body"><b>Give your eyes a break.</b> Look 6 m away for 20 seconds. The clock keeps running.</div>
+        <button class="dismiss" type="button" aria-label="Dismiss">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"/></svg>
+        </button>
+      </div>
+      <div class="row">
+        <div class="row-label">Something to <b>hear</b></div>
+        <div class="chips">
+          <button class="chip is-selected" type="button">Rain</button>
+          <button class="chip" type="button">Fireplace</button>
+          <button class="chip" type="button">Forest</button>
+          <button class="chip" type="button">Cafe</button>
+          <button class="chip" type="button">Silence</button>
+        </div>
+      </div>
+      <div class="row">
+        <div class="row-label">Something to <b>see</b></div>
+        <div class="thumbs">
+          <button class="thumb is-selected" type="button" aria-label="Background 1"></button>
+          <button class="thumb" type="button" aria-label="Background 2"></button>
+          <button class="thumb" type="button" aria-label="Background 3"></button>
+        </div>
+      </div>
+      </div>
+    </section>
+
+    <div class="center-col">
+      <div class="clock">18:42</div>
+
+      <div class="action-slot">
+        <button class="btn btn-primary" type="button">Pause</button>
+        <button class="btn btn-ghost" type="button">I am done</button>
+      </div>
+    </div>
+
+    <div class="mascot">mascot — sitting,<br>looking at the clock</div>
+
+  </div>
+</div>
+
+<script>
+(function () {
+  'use strict';
+
+  /* Plegado del sidebar. Cada marco es independiente. */
+  document.querySelectorAll('[data-toggle]').forEach(function (btn) {
+    btn.addEventListener('click', function () {
+      btn.closest('.frame').classList.toggle('is-collapsed');
+    });
+  });
+
+  /* La card se pliega en burbuja y se despliega. En Corriendo arranca
+     plegada; el punto en la burbuja avisa que hay un 20-20-6 esperando. */
+  document.querySelectorAll('[data-card]').forEach(function (card) {
+    var dot = card.querySelector('.bubble .dot');
+    card.querySelector('[data-card-collapse]').addEventListener('click', function () {
+      card.classList.add('is-bubble');
+      if (dot) { dot.hidden = !card.querySelector('.eye-notice') || card.querySelector('.eye-notice').hidden; }
+    });
+    card.querySelector('[data-card-open]').addEventListener('click', function () {
+      card.classList.remove('is-bubble');
+    });
+  });
+
+  /* El aviso 20-20-6 se cierra solo con su X. No detiene el reloj. */
+  document.querySelectorAll('.eye-notice .dismiss').forEach(function (btn) {
+    btn.addEventListener('click', function () {
+      var card = btn.closest('[data-card]');
+      btn.closest('.eye-notice').hidden = true;
+      var dot = card && card.querySelector('.bubble .dot');
+      if (dot) { dot.hidden = true; }
+    });
+  });
+
+  /* El switch de los descansos de vista manda sobre el intervalo:
+     apagado, no hay aviso, así que elegir cada cuánto no significa nada. */
+  document.querySelectorAll('[data-eye-toggle]').forEach(function (input) {
+    var chips = input.closest('.row').querySelector('[data-eye-chips]');
+    function sync() {
+      chips.classList.toggle('is-off', !input.checked);
+      chips.querySelectorAll('.chip').forEach(function (c) { c.disabled = !input.checked; });
+    }
+    input.addEventListener('change', sync);
+    sync();
+  });
+
+  /* Elegir intervalo dentro de esa fila. */
+  document.querySelectorAll('[data-eye-chips] .chip').forEach(function (chip) {
+    chip.addEventListener('click', function () {
+      chip.parentNode.querySelectorAll('.chip').forEach(function (c) { c.classList.remove('is-selected'); });
+      chip.classList.add('is-selected');
+    });
+  });
+
+  var frame = document.getElementById('frame-idle');
+  if (!frame) { return; }
+
+  /* Rangos. Un dial necesita un tope; estos son los asumidos. */
+  var RANGE = {
+    focus: { min: 5, max: 120, presets: [15, 25, 30, 45, 60] },
+    break: { min: 1, max: 30, presets: [5, 10, 15, 30] }
+  };
+  var value = { focus: 25, break: 5 };
+  var target = 'focus';
+
+  var overlay  = frame.querySelector('[data-overlay]');
+  var presets  = frame.querySelector('[data-presets]');
+  var dial     = frame.querySelector('[data-dial]');
+  var arc      = frame.querySelector('[data-arc]');
+  var handle   = frame.querySelector('[data-handle]');
+  var handleDot= frame.querySelector('[data-handle-dot]');
+  var ticks    = frame.querySelector('[data-ticks]');
+  var dialNum  = frame.querySelector('[data-dial-num]');
+  var clock    = frame.querySelector('[data-clock]');
+  var modeBox  = frame.querySelector('[data-mode]');
+  var durBox   = frame.querySelector('[data-durations]');
+  var CIRC     = 2 * Math.PI * 88;
+
+  function mmss(min) {
+    return String(min).padStart(2, '0') + ':00';
+  }
+
+  /* Marcas alrededor del anillo. Sin ellas el círculo se lee como un
+     indicador de progreso y no como algo que se puede agarrar. */
+  function buildTicks() {
+    var svgNS = 'http://www.w3.org/2000/svg';
+    ticks.innerHTML = '';
+    for (var i = 0; i < 36; i++) {
+      var a = (i / 36) * 2 * Math.PI - Math.PI / 2;
+      var long = i % 3 === 0;
+      var r1 = 99;
+      var r2 = long ? 107 : 103;
+      var line = document.createElementNS(svgNS, 'line');
+      line.setAttribute('x1', String(110 + r1 * Math.cos(a)));
+      line.setAttribute('y1', String(110 + r1 * Math.sin(a)));
+      line.setAttribute('x2', String(110 + r2 * Math.cos(a)));
+      line.setAttribute('y2', String(110 + r2 * Math.sin(a)));
+      line.setAttribute('opacity', long ? '0.9' : '0.45');
+      ticks.appendChild(line);
+    }
+  }
+
+  function paint() {
+    frame.querySelector('[data-out="focus"]').textContent = mmss(value.focus);
+    frame.querySelector('[data-out="break"]').textContent = mmss(value.break);
+    frame.querySelector('[data-sheet-out="focus"]').textContent = value.focus + ' min';
+    frame.querySelector('[data-sheet-out="break"]').textContent = value.break + ' min';
+
+    if (modeBox.querySelector('[data-mode-timer]').classList.contains('is-selected')) {
+      clock.textContent = mmss(value.focus);
+    }
+
+    var r = RANGE[target];
+    var v = value[target];
+    var frac = (v - r.min) / (r.max - r.min);
+
+    dialNum.textContent = v;
+    arc.setAttribute('stroke-dashoffset', String(CIRC * (1 - frac)));
+    var ang = frac * 2 * Math.PI - Math.PI / 2;
+    var hx = String(110 + 88 * Math.cos(ang));
+    var hy = String(110 + 88 * Math.sin(ang));
+    handle.setAttribute('cx', hx);
+    handle.setAttribute('cy', hy);
+    handleDot.setAttribute('cx', hx);
+    handleDot.setAttribute('cy', hy);
+
+    dial.setAttribute('aria-valuemin', String(r.min));
+    dial.setAttribute('aria-valuemax', String(r.max));
+    dial.setAttribute('aria-valuenow', String(v));
+
+    presets.querySelectorAll('.chip').forEach(function (c) {
+      c.classList.toggle('is-selected', Number(c.dataset.preset) === v);
+    });
+  }
+
+  function buildPresets() {
+    presets.innerHTML = '';
+    RANGE[target].presets.forEach(function (min) {
+      var b = document.createElement('button');
+      b.type = 'button';
+      b.className = 'chip';
+      b.dataset.preset = String(min);
+      b.textContent = min + ' min';
+      b.addEventListener('click', function () {
+        value[target] = min;
+        paint();
+      });
+      presets.appendChild(b);
+    });
+  }
+
+  function setTarget(which) {
+    target = which;
+    frame.querySelector('[data-target-focus]').classList.toggle('is-selected', which === 'focus');
+    frame.querySelector('[data-target-break]').classList.toggle('is-selected', which === 'break');
+    buildPresets();
+    paint();
+  }
+
+  function open(which) {
+    setTarget(which);
+    overlay.hidden = false;
+    dial.focus();
+  }
+  function close() {
+    overlay.hidden = true;
+  }
+
+  frame.querySelectorAll('[data-open]').forEach(function (b) {
+    b.addEventListener('click', function () { open(b.dataset.open); });
+  });
+  frame.querySelector('[data-close]').addEventListener('click', close);
+  overlay.addEventListener('mousedown', function (e) {
+    if (e.target === overlay) { close(); }
+  });
+  document.addEventListener('keydown', function (e) {
+    if (e.key === 'Escape' && !overlay.hidden) { close(); }
+  });
+
+  frame.querySelector('[data-target-focus]').addEventListener('click', function () { setTarget('focus'); });
+  frame.querySelector('[data-target-break]').addEventListener('click', function () { setTarget('break'); });
+
+  /* Arrastre sobre el dial. El ángulo desde el centro da el valor. */
+  function fromPointer(e) {
+    var box = dial.getBoundingClientRect();
+    var dx = e.clientX - (box.left + box.width / 2);
+    var dy = e.clientY - (box.top + box.height / 2);
+    var ang = Math.atan2(dy, dx) + Math.PI / 2;
+    if (ang < 0) { ang += 2 * Math.PI; }
+    var r = RANGE[target];
+    value[target] = Math.round(r.min + (ang / (2 * Math.PI)) * (r.max - r.min));
+    paint();
+  }
+  dial.addEventListener('pointerdown', function (e) {
+    dial.setPointerCapture(e.pointerId);
+    fromPointer(e);
+  });
+  dial.addEventListener('pointermove', function (e) {
+    if (dial.hasPointerCapture(e.pointerId)) { fromPointer(e); }
+  });
+
+  /* El dial también responde al teclado: sin esto no es usable sin mouse. */
+  dial.addEventListener('keydown', function (e) {
+    var r = RANGE[target];
+    var step = (e.key === 'PageUp' || e.key === 'PageDown') ? 5 : 1;
+    var d = 0;
+    if (e.key === 'ArrowRight' || e.key === 'ArrowUp' || e.key === 'PageUp') { d = step; }
+    if (e.key === 'ArrowLeft' || e.key === 'ArrowDown' || e.key === 'PageDown') { d = -step; }
+    if (e.key === 'Home') { value[target] = r.min; }
+    if (e.key === 'End') { value[target] = r.max; }
+    if (!d && e.key !== 'Home' && e.key !== 'End') { return; }
+    e.preventDefault();
+    value[target] = Math.min(r.max, Math.max(r.min, value[target] + d));
+    paint();
+  });
+
+  /* Cambio de modo. Con cronómetro no hay duraciones que fijar. */
+  modeBox.querySelectorAll('button').forEach(function (btn) {
+    btn.addEventListener('click', function () {
+      modeBox.querySelectorAll('button').forEach(function (b) { b.classList.remove('is-selected'); });
+      btn.classList.add('is-selected');
+      var isTimer = btn.hasAttribute('data-mode-timer');
+      durBox.dataset.hidden = isTimer ? 'false' : 'true';
+      clock.textContent = isTimer ? mmss(value.focus) : '00:00:00';
+    });
+  });
+
+  /* ---- Racha y meta del día ----
+     La llama es solo para rachas mayores a 5: antes de eso no hay
+     nada que celebrar y el ícono pierde sentido. */
+  var STREAK = 12;
+  var TODAY_MIN = 150;   // 2h 30m
+  var GOAL_MIN = 240;    // 4h
+
+  function fmtHm(min) {
+    var h = Math.floor(min / 60);
+    var m = min % 60;
+    if (!h) { return m + 'm'; }
+    return m ? h + 'h ' + m + 'm' : h + 'h';
+  }
+
+  (function paintStreak() {
+    var pct = Math.min(1, TODAY_MIN / GOAL_MIN);
+    frame.querySelector('[data-flame]').hidden = STREAK <= 5;
+    frame.querySelector('[data-streak-text]').textContent = STREAK + ' days in a row';
+    frame.querySelector('[data-fill]').style.width = (pct * 100) + '%';
+    frame.querySelector('[data-now]').textContent = fmtHm(TODAY_MIN);
+  }());
+
+  buildTicks();
+  buildPresets();
+  paint();
+}());
+</script>
+
+</body>
+</html>
