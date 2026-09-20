@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onUnmounted, ref, watch } from 'vue'
+import { computed, onUnmounted, ref, useTemplateRef, watch } from 'vue'
 import FlipClock from '@/components/FlipClock.vue'
 import { useSettingsStore } from '@/stores/settings'
 import { useTimerStore } from '@/stores/timer'
@@ -33,6 +33,12 @@ const phaseLine = computed(() => {
     return { lead: '', word: focus ? 'Focus' : 'Break', tail: ' paused' }
   }
 
+  if (timer.isOvertime) {
+    return focus
+      ? { lead: '... ', word: 'bonus', tail: ' time!' }
+      : { lead: '', word: 'Break', tail: ' is over' }
+  }
+
   return { lead: 'Time to ', word: focus ? 'focus' : 'rest', tail: '' }
 })
 // #endregion
@@ -64,6 +70,9 @@ watch(
 onUnmounted(() => clearTimeout(celebrationTimer))
 // #endregion
 
+const clock = useTemplateRef<HTMLElement>('clock')
+defineExpose({ clock })
+
 const MODE_BUTTON =
   'flex-1 cursor-pointer rounded-[7px] text-body transition-colors duration-150 motion-reduce:transition-none'
 const ACTION_BUTTON =
@@ -82,12 +91,18 @@ const DURATION_BUTTON =
         The session could not be loaded. Please refresh the page to try again.
       </p>
 
+      <!-- Above the clock - Save error -->
+      <p v-if="timer.saveFailed" class="text-tiny text-danger" role="alert">
+        This session could not be saved. It is still running here, so keep this tab open and try
+        again.
+      </p>
+
       <!-- Above the clock - Phase -->
       <p v-if="phaseLine !== null" class="text-[2.25rem] leading-none text-text-muted"
         :class="isPaused ? 'motion-safe:animate-pulse' : ''">
         {{ phaseLine.lead
-        }}<b class="text-[1.25em] font-semibold" :class="isPaused ? 'text-info' : 'text-text-primary'">{{
-          phaseLine.word }}</b>{{ phaseLine.tail }}
+        }}<b class="text-[1.25em] font-semibold" :class="isPaused ? 'text-info' : 'text-text-primary'">{{ phaseLine.word
+        }}</b>{{ phaseLine.tail }}
       </p>
 
       <!-- Above the clock - Break offer -->
@@ -133,12 +148,12 @@ const DURATION_BUTTON =
     </div>
 
     <!-- Clock -->
-    <div
+    <div ref="clock"
       class="relative font-clock text-clock leading-[1.15] tracking-[0.04em] transition-colors duration-200 motion-reduce:transition-none"
       :class="[clockColor, celebrating ? 'clock-pop' : '']">
       <!-- Clock - Overtime sign -->
       <span v-if="timer.isOvertime"
-        class="pointer-events-none absolute top-1/2 right-full mr-[0.12em] -translate-y-[0.54em] text-[0.42em] leading-none text-accent opacity-80">
+        class="pointer-events-none absolute top-1/2 right-full mr-[0.12em] translate-y-[-0.54em] text-[0.42em] leading-none text-accent opacity-80">
         +
       </span>
 
@@ -157,13 +172,13 @@ const DURATION_BUTTON =
           <span class="text-tiny tracking-[0.08em] text-text-muted uppercase">Focus</span>
           <span class="font-clock text-body text-text-primary">{{
             formatMinutes(settings.focusMs)
-            }}</span>
+          }}</span>
         </button>
         <button type="button" :class="DURATION_BUTTON" :disabled="!settings.canEdit" @click="overlayTarget = 'break'">
           <span class="text-tiny tracking-[0.08em] text-text-muted uppercase">Break</span>
           <span class="font-clock text-body text-text-primary">{{
             formatMinutes(settings.breakMs)
-            }}</span>
+          }}</span>
         </button>
       </div>
 
@@ -191,7 +206,6 @@ const DURATION_BUTTON =
           </button>
         </template>
       </div>
-
     </div>
   </div>
 

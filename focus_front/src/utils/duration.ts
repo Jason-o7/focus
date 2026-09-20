@@ -5,6 +5,9 @@ export const FOCUS_MAX_MS = 120 * MINUTE_MS
 export const BREAK_MIN_MS = 1 * MINUTE_MS
 export const BREAK_MAX_MS = 30 * MINUTE_MS
 
+export const GOAL_MIN_MS = 1 * MINUTE_MS
+export const GOAL_MAX_MS = 12 * 60 * MINUTE_MS
+
 // TODO: remove. A 5 second duration, to watch what a session does when it runs out.
 export const DEBUG_MS = 5_000
 
@@ -15,6 +18,10 @@ export function isNonNegativeMs(value: unknown): value is number {
 export function isValidFocusMs(value: unknown): value is number {
   if (value === DEBUG_MS) return true
   return isNonNegativeMs(value) && value >= FOCUS_MIN_MS && value <= FOCUS_MAX_MS
+}
+
+export function isValidGoalMs(value: unknown): value is number {
+  return isNonNegativeMs(value) && value >= GOAL_MIN_MS && value <= GOAL_MAX_MS
 }
 
 export function isValidBreakMs(value: unknown): value is number {

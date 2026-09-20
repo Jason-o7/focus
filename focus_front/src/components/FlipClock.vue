@@ -76,12 +76,16 @@ onUnmounted(() => timers.forEach(clearTimeout))
   <div class="flex" aria-hidden="true">
     <template v-for="(cell, index) in cells" :key="index">
       <!-- Separator -->
-      <span v-if="cell.char === ':'" class="flip-cell flex items-center justify-center">{{ cell.char }}</span>
+      <span v-if="cell.char === ':'" class="flip-cell flex items-center justify-center">{{
+        cell.char
+      }}</span>
 
       <!-- Digit -->
       <span v-else class="flip-cell">
         <span class="flip-half flip-half-top">
-          <span class="flip-glyph flip-glyph-top">{{ cell.flipping ? cell.previous : cell.char }}</span>
+          <span class="flip-glyph flip-glyph-top">{{
+            cell.flipping ? cell.previous : cell.char
+          }}</span>
         </span>
         <span class="flip-half flip-half-bottom">
           <span class="flip-glyph flip-glyph-bottom">{{ cell.char }}</span>

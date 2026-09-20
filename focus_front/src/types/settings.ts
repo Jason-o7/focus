@@ -11,6 +11,7 @@ export interface Settings {
   mode: TimerMode
   focusMs: number
   breakMs: number
+  dailyGoalMs: number
 }
 
 export const DEFAULT_SETTINGS: Settings = {
@@ -22,4 +23,6 @@ export const DEFAULT_SETTINGS: Settings = {
   mode: 'timer',
   focusMs: 25 * MINUTE_MS,
   breakMs: 5 * MINUTE_MS,
+  // TODO: back to 2 * 60 * MINUTE_MS. Lowered to watch a session go past the bar.
+  dailyGoalMs: 1 * MINUTE_MS,
 }

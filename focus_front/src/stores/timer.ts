@@ -1,22 +1,30 @@
 import { defineStore } from 'pinia'
 import { computed, ref } from 'vue'
 import { repo } from '@/api'
+import { useSessionsStore } from '@/stores/sessions'
 import { useSettingsStore } from '@/stores/settings'
 import type { ActiveSession, TimerMode, TimerPhase, TimerStatus } from '@/types/timer'
+import { mergeByDay, splitByDay } from '@/utils/day'
 
 const TICK_MS = 1000
 
+// Under a second is a misclick, not a session.
+const MIN_RECORDED_MS = 1000
+
 export const useTimerStore = defineStore('timer', () => {
   const settings = useSettingsStore()
+  const sessions = useSessionsStore()
 
   // #region Session state
   const id = ref('')
   const mode = ref<TimerMode>('timer')
   const phase = ref<TimerPhase>('focus')
+  const startedAt = ref(0)
   const status = ref<TimerStatus>('stopped')
   const focusMs = ref(0)
   const breakMs = ref(0)
   const focusedMs = ref(0)
+  const focusedByDay = ref<Record<string, number>>({})
   const phaseAccumulatedMs = ref(0)
   const segmentStartedAt = ref<number | null>(null)
   // #endregion
@@ -73,7 +81,9 @@ export const useTimerStore = defineStore('timer', () => {
     targetMs.value === null ? null : targetMs.value - elapsedMs.value,
   )
 
-  const isOvertime = computed(() => remainingMs.value !== null && remainingMs.value <= 0)
+  const isOvertime = computed(
+    () => status.value !== 'stopped' && remainingMs.value !== null && remainingMs.value <= 0,
+  )
 
   const canStartBreak = computed(
     () => status.value !== 'stopped' && mode.value === 'timer' && phase.value === 'focus',
@@ -97,10 +107,12 @@ export const useTimerStore = defineStore('timer', () => {
     id.value = session.id
     mode.value = session.mode
     phase.value = session.phase
+    startedAt.value = session.startedAt
     status.value = session.status
     focusMs.value = session.focusMs
     breakMs.value = session.breakMs
     focusedMs.value = session.focusedMs
+    focusedByDay.value = { ...session.focusedByDay }
     phaseAccumulatedMs.value = session.phaseAccumulatedMs
     segmentStartedAt.value = session.segmentStartedAt
   }
@@ -110,10 +122,12 @@ export const useTimerStore = defineStore('timer', () => {
       id: id.value,
       mode: mode.value,
       phase: phase.value,
+      startedAt: startedAt.value,
       status: status.value,
       focusMs: focusMs.value,
       breakMs: breakMs.value,
       focusedMs: focusedMs.value,
+      focusedByDay: { ...focusedByDay.value },
       phaseAccumulatedMs: phaseAccumulatedMs.value,
       segmentStartedAt: segmentStartedAt.value,
     }
@@ -122,10 +136,12 @@ export const useTimerStore = defineStore('timer', () => {
   function reset() {
     id.value = ''
     phase.value = 'focus'
+    startedAt.value = 0
     status.value = 'stopped'
     focusMs.value = 0
     breakMs.value = 0
     focusedMs.value = 0
+    focusedByDay.value = {}
     phaseAccumulatedMs.value = 0
     segmentStartedAt.value = null
   }
@@ -147,7 +163,7 @@ export const useTimerStore = defineStore('timer', () => {
       loaded.value = true
       loadFailed.value = false
 
-      if (session === null || session.status === 'stopped') {
+      if (session === null || session.status === 'stopped' || sessions.has(session.id)) {
         reset()
         if (session !== null) await repo().activeSession.clear()
         return
@@ -162,17 +178,30 @@ export const useTimerStore = defineStore('timer', () => {
   }
   // #endregion
 
+  // #region Focus time, day by day
+  function openFocusSegment(at: number) {
+    if (phase.value !== 'focus' || segmentStartedAt.value === null) return {}
+    return splitByDay(segmentStartedAt.value, at)
+  }
+
+  function closeFocusSegment(at: number) {
+    focusedByDay.value = mergeByDay(focusedByDay.value, openFocusSegment(at))
+  }
+  // #endregion
+
   // #region Actions
   async function start() {
     if (!canEdit.value) return
     if (status.value !== 'stopped') return
 
     id.value = crypto.randomUUID()
+    startedAt.value = Date.now()
     mode.value = settings.mode
     focusMs.value = settings.mode === 'stopwatch' ? 0 : settings.focusMs
     breakMs.value = settings.mode === 'stopwatch' ? 0 : settings.breakMs
     phase.value = 'focus'
     focusedMs.value = 0
+    focusedByDay.value = {}
     phaseAccumulatedMs.value = 0
     segmentStartedAt.value = Date.now()
     status.value = 'running'
@@ -184,7 +213,9 @@ export const useTimerStore = defineStore('timer', () => {
   async function pause() {
     if (status.value !== 'running') return
 
-    phaseAccumulatedMs.value = elapsedAt(Date.now())
+    const at = Date.now()
+    closeFocusSegment(at)
+    phaseAccumulatedMs.value = elapsedAt(at)
     segmentStartedAt.value = null
     status.value = 'paused'
 
@@ -207,10 +238,12 @@ export const useTimerStore = defineStore('timer', () => {
 
     if (settings.canEdit) breakMs.value = settings.breakMs
 
-    focusedMs.value = elapsedAt(Date.now())
+    const at = Date.now()
+    closeFocusSegment(at)
+    focusedMs.value = elapsedAt(at)
     phase.value = 'break'
     phaseAccumulatedMs.value = 0
-    segmentStartedAt.value = Date.now()
+    segmentStartedAt.value = at
     status.value = 'running'
 
     startTicking()
@@ -220,10 +253,26 @@ export const useTimerStore = defineStore('timer', () => {
   async function stop() {
     if (status.value === 'stopped') return
 
-    if (phase.value === 'focus') focusedMs.value = elapsedAt(Date.now())
-    stopTicking()
+    const endedAt = Date.now()
+    const totalMs = phase.value === 'focus' ? elapsedAt(endedAt) : focusedMs.value
 
-    // TODO: write the finished session to SessionRepo before clearing it.
+    if (totalMs >= MIN_RECORDED_MS) {
+      const stored = await sessions.add({
+        id: id.value,
+        mode: mode.value,
+        startedAt: startedAt.value,
+        endedAt,
+        focusedMs: totalMs,
+        focusedByDay: mergeByDay(focusedByDay.value, openFocusSegment(endedAt)),
+      })
+
+      if (!stored) {
+        saveFailed.value = true
+        return
+      }
+    }
+
+    stopTicking()
     reset()
 
     try {
@@ -239,6 +288,7 @@ export const useTimerStore = defineStore('timer', () => {
     id,
     mode,
     phase,
+    startedAt,
     status,
     focusMs,
     breakMs,

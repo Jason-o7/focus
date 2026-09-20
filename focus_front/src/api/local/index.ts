@@ -1,4 +1,5 @@
 export { activeSession } from './activeSession'
 export { backgrounds } from './backgrounds'
+export { sessions } from './sessions'
 export { settings } from './settings'
 export { sounds } from './sounds'

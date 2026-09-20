@@ -108,30 +108,70 @@ function onKeyDown(event: KeyboardEvent) {
 </script>
 
 <template>
-  <div ref="dial" class="group relative size-55 touch-none rounded-full outline-none"
-    :class="dragging ? 'cursor-grabbing' : 'cursor-grab'" tabindex="0" role="slider" aria-label="Minutes"
-    :aria-valuemin="min" :aria-valuemax="max" :aria-valuenow="modelValue" @pointerdown="onPointerDown"
-    @pointermove="onPointerMove" @pointerup="onPointerUp" @pointercancel="onPointerUp" @keydown="onKeyDown"
-    @pointerenter="hovered = true" @pointerleave="hovered = false">
+  <div
+    ref="dial"
+    class="group relative size-55 touch-none rounded-full outline-none"
+    :class="dragging ? 'cursor-grabbing' : 'cursor-grab'"
+    tabindex="0"
+    role="slider"
+    aria-label="Minutes"
+    :aria-valuemin="min"
+    :aria-valuemax="max"
+    :aria-valuenow="modelValue"
+    @pointerdown="onPointerDown"
+    @pointermove="onPointerMove"
+    @pointerup="onPointerUp"
+    @pointercancel="onPointerUp"
+    @keydown="onKeyDown"
+    @pointerenter="hovered = true"
+    @pointerleave="hovered = false"
+  >
     <svg class="block size-55" viewBox="0 0 220 220">
       <!-- Ticks -->
       <g class="stroke-text-muted" stroke-width="2" stroke-linecap="round">
-        <line v-for="(tick, index) in ticks" :key="index" :x1="tick.x" :y1="tick.y" :x2="tick.x2" :y2="tick.y2"
-          :opacity="tick.opacity" />
+        <line
+          v-for="(tick, index) in ticks"
+          :key="index"
+          :x1="tick.x"
+          :y1="tick.y"
+          :x2="tick.x2"
+          :y2="tick.y2"
+          :opacity="tick.opacity"
+        />
       </g>
 
       <!-- Track -->
-      <circle :cx="CENTER" :cy="CENTER" :r="RADIUS" fill="none" class="stroke-border" stroke-width="10" />
+      <circle
+        :cx="CENTER"
+        :cy="CENTER"
+        :r="RADIUS"
+        fill="none"
+        class="stroke-border"
+        stroke-width="10"
+      />
 
       <!-- Filled arc -->
-      <circle :cx="CENTER" :cy="CENTER" :r="RADIUS" fill="none" class="stroke-accent" stroke-width="10"
-        stroke-linecap="round" :transform="`rotate(-90 ${CENTER} ${CENTER})`" :stroke-dasharray="CIRCUMFERENCE"
-        :stroke-dashoffset="CIRCUMFERENCE * (1 - fraction)" />
+      <circle
+        :cx="CENTER"
+        :cy="CENTER"
+        :r="RADIUS"
+        fill="none"
+        class="stroke-accent"
+        stroke-width="10"
+        stroke-linecap="round"
+        :transform="`rotate(-90 ${CENTER} ${CENTER})`"
+        :stroke-dasharray="CIRCUMFERENCE"
+        :stroke-dashoffset="CIRCUMFERENCE * (1 - fraction)"
+      />
 
       <!-- Handle -->
-      <circle :cx="handle.x" :cy="handle.y" :r="handleRadius"
+      <circle
+        :cx="handle.x"
+        :cy="handle.y"
+        :r="handleRadius"
         class="fill-background stroke-accent transition-[r] duration-150 motion-reduce:transition-none"
-        stroke-width="3" />
+        stroke-width="3"
+      />
       <circle :cx="handle.x" :cy="handle.y" r="4" class="fill-accent" />
     </svg>
 
@@ -143,6 +183,7 @@ function onKeyDown(event: KeyboardEvent) {
 
     <!-- Focus ring -->
     <span
-      class="pointer-events-none absolute inset-0 rounded-full ring-2 ring-accent opacity-0 group-focus-visible:opacity-100" />
+      class="pointer-events-none absolute inset-0 rounded-full ring-2 ring-accent opacity-0 group-focus-visible:opacity-100"
+    />
   </div>
 </template>

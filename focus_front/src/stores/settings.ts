@@ -3,7 +3,7 @@ import { computed, ref } from 'vue'
 import { repo } from '@/api'
 import { DEFAULT_SETTINGS, type Settings } from '@/types/settings'
 import { isValidEyeBreakMinutes } from '@/utils/eyeBreak'
-import { isValidBreakMs, isValidFocusMs } from '@/utils/duration'
+import { isValidBreakMs, isValidFocusMs, isValidGoalMs } from '@/utils/duration'
 import type { TimerMode } from '@/types/timer'
 
 export const useSettingsStore = defineStore('settings', () => {
@@ -16,6 +16,7 @@ export const useSettingsStore = defineStore('settings', () => {
   const mode = ref<TimerMode>(DEFAULT_SETTINGS.mode)
   const focusMs = ref(DEFAULT_SETTINGS.focusMs)
   const breakMs = ref(DEFAULT_SETTINGS.breakMs)
+  const dailyGoalMs = ref(DEFAULT_SETTINGS.dailyGoalMs)
 
   const loaded = ref(false)
   const loadFailed = ref(false)
@@ -35,6 +36,7 @@ export const useSettingsStore = defineStore('settings', () => {
     mode.value = value.mode
     focusMs.value = value.focusMs
     breakMs.value = value.breakMs
+    dailyGoalMs.value = value.dailyGoalMs
   }
 
   function snapshot(): Settings {
@@ -47,6 +49,7 @@ export const useSettingsStore = defineStore('settings', () => {
       mode: mode.value,
       focusMs: focusMs.value,
       breakMs: breakMs.value,
+      dailyGoalMs: dailyGoalMs.value,
     }
   }
 
@@ -136,6 +139,13 @@ export const useSettingsStore = defineStore('settings', () => {
     await persist()
   }
 
+  async function setDailyGoalMs(value: number) {
+    if (!canEdit.value) return
+    if (!isValidGoalMs(value)) return
+    dailyGoalMs.value = value
+    await persist()
+  }
+
   async function setBreakMs(value: number) {
     if (!canEdit.value) return
     if (!isValidBreakMs(value)) return
@@ -153,6 +163,7 @@ export const useSettingsStore = defineStore('settings', () => {
     mode,
     focusMs,
     breakMs,
+    dailyGoalMs,
     loaded,
     loadFailed,
     saveFailed,
@@ -167,5 +178,6 @@ export const useSettingsStore = defineStore('settings', () => {
     selectMode,
     setFocusMs,
     setBreakMs,
+    setDailyGoalMs,
   }
 })

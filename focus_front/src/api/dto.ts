@@ -1,7 +1,9 @@
 import type { Background } from '@/types/background'
 import { DEFAULT_SETTINGS, type Settings } from '@/types/settings'
 import { isValidEyeBreakMinutes } from '@/utils/eyeBreak'
-import { isNonNegativeMs, isValidBreakMs, isValidFocusMs } from '@/utils/duration'
+import { isNonNegativeMs, isValidBreakMs, isValidFocusMs, isValidGoalMs } from '@/utils/duration'
+import { dayKey } from '@/utils/day'
+import type { Session } from '@/types/session'
 import type { Sound } from '@/types/sound'
 import type { ActiveSession, TimerMode, TimerPhase, TimerStatus } from '@/types/timer'
 
@@ -25,16 +27,28 @@ export interface SettingsDto {
   mode: TimerMode
   focusMs: number
   breakMs: number
+  dailyGoalMs: number
+}
+
+export interface SessionDto {
+  id: string
+  mode: TimerMode
+  startedAt: number
+  endedAt: number
+  focusedMs: number
+  focusedByDay: Record<string, number>
 }
 
 export interface ActiveSessionDto {
   id: string
   mode: TimerMode
   phase: TimerPhase
+  startedAt: number
   status: TimerStatus
   focusMs: number
   breakMs: number
   focusedMs: number
+  focusedByDay: Record<string, number>
   phaseAccumulatedMs: number
   segmentStartedAt: number | null
 }
@@ -98,6 +112,7 @@ export function toSettings(raw: unknown): Settings {
     mode: isTimerMode(raw.mode) ? raw.mode : DEFAULT_SETTINGS.mode,
     focusMs: isValidFocusMs(raw.focusMs) ? raw.focusMs : DEFAULT_SETTINGS.focusMs,
     breakMs: isValidBreakMs(raw.breakMs) ? raw.breakMs : DEFAULT_SETTINGS.breakMs,
+    dailyGoalMs: isValidGoalMs(raw.dailyGoalMs) ? raw.dailyGoalMs : DEFAULT_SETTINGS.dailyGoalMs,
   }
 }
 
@@ -115,12 +130,29 @@ function isTimerStatus(raw: unknown): raw is TimerStatus {
 
 const FUTURE_TOLERANCE_MS = 60_000
 
+const DAY_KEY = /^\d{4}-\d{2}-\d{2}$/
+
+function toDayTotals(raw: unknown, day: string, fallbackMs: number): Record<string, number> {
+  const totals: Record<string, number> = {}
+
+  if (isRecord(raw)) {
+    for (const [key, ms] of Object.entries(raw)) {
+      if (DAY_KEY.test(key) && isNonNegativeMs(ms)) totals[key] = ms
+    }
+  }
+
+  if (Object.keys(totals).length > 0) return totals
+
+  return fallbackMs > 0 ? { [day]: fallbackMs } : {}
+}
+
 export function toActiveSession(raw: unknown, at: number = Date.now()): ActiveSession | null {
   if (!isRecord(raw)) return null
 
   if (typeof raw.id !== 'string' || raw.id === '') return null
   if (!isTimerMode(raw.mode)) return null
   if (!isTimerPhase(raw.phase)) return null
+  if (!isNonNegativeMs(raw.startedAt) || raw.startedAt > at + FUTURE_TOLERANCE_MS) return null
   if (!isTimerStatus(raw.status)) return null
 
   if (!isNonNegativeMs(raw.focusMs)) return null
@@ -144,13 +176,42 @@ export function toActiveSession(raw: unknown, at: number = Date.now()): ActiveSe
     id: raw.id,
     mode: raw.mode,
     phase: raw.phase,
+    startedAt: raw.startedAt,
     status: raw.status,
     focusMs: raw.focusMs,
     breakMs: raw.breakMs,
     focusedMs: raw.focusedMs,
+    focusedByDay: toDayTotals(raw.focusedByDay, dayKey(raw.startedAt), raw.focusedMs),
     phaseAccumulatedMs: raw.phaseAccumulatedMs,
     segmentStartedAt: startedAt,
   }
+}
+export function toSession(raw: unknown, at: number = Date.now()): Session | null {
+  if (!isRecord(raw)) return null
+
+  if (typeof raw.id !== 'string' || raw.id === '') return null
+  if (!isTimerMode(raw.mode)) return null
+  if (!isNonNegativeMs(raw.startedAt)) return null
+  if (!isNonNegativeMs(raw.endedAt)) return null
+  if (!isNonNegativeMs(raw.focusedMs)) return null
+
+  if (raw.endedAt < raw.startedAt) return null
+  if (raw.startedAt > at + FUTURE_TOLERANCE_MS) return null
+  if (raw.focusedMs > raw.endedAt - raw.startedAt + FUTURE_TOLERANCE_MS) return null
+
+  return {
+    id: raw.id,
+    mode: raw.mode,
+    startedAt: raw.startedAt,
+    endedAt: raw.endedAt,
+    focusedMs: raw.focusedMs,
+    focusedByDay: toDayTotals(raw.focusedByDay, dayKey(raw.startedAt), raw.focusedMs),
+  }
+}
+
+export function toSessionList(raw: unknown, at: number = Date.now()): Session[] {
+  if (!Array.isArray(raw)) throw new Error('The session history is not a list')
+  return raw.map((item) => toSession(item, at)).filter((s): s is Session => s !== null)
 }
 // #endregion
 
@@ -165,6 +226,18 @@ export function toSettingsDto(value: Settings): SettingsDto {
     mode: value.mode,
     focusMs: value.focusMs,
     breakMs: value.breakMs,
+    dailyGoalMs: value.dailyGoalMs,
+  }
+}
+
+export function toSessionDto(value: Session): SessionDto {
+  return {
+    id: value.id,
+    mode: value.mode,
+    startedAt: value.startedAt,
+    endedAt: value.endedAt,
+    focusedMs: value.focusedMs,
+    focusedByDay: { ...value.focusedByDay },
   }
 }
 
@@ -173,10 +246,12 @@ export function toActiveSessionDto(value: ActiveSession): ActiveSessionDto {
     id: value.id,
     mode: value.mode,
     phase: value.phase,
+    startedAt: value.startedAt,
     status: value.status,
     focusMs: value.focusMs,
     breakMs: value.breakMs,
     focusedMs: value.focusedMs,
+    focusedByDay: { ...value.focusedByDay },
     phaseAccumulatedMs: value.phaseAccumulatedMs,
     segmentStartedAt: value.segmentStartedAt,
   }
