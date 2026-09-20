@@ -12,6 +12,7 @@ import type { Session } from '@/types/session'
 import type { TimerStatus } from '@/types/timer'
 import { shiftDay } from '@/utils/day'
 import DayProgress from '@/views/home/DayProgress.vue'
+import DebtJar from '@/views/home/DebtJar.vue'
 import SettingsCard from '@/views/home/SettingsCard.vue'
 import TimerPanel from '@/views/home/TimerPanel.vue'
 
@@ -26,7 +27,7 @@ onMounted(async () => {
   await Promise.allSettled([settings.load(), sounds.load(), backgrounds.load()])
   await sessions.load()
   await timer.load()
-  settledMs.value = sessions.todayMs
+  settle()
 })
 
 // #region Pet
@@ -46,45 +47,73 @@ watch(
 )
 // #endregion
 
-// #region The finished session flying into the bar
+// #region The finished session flying to where it counts
 const FLIGHT_MS = 820
 const LANDING_MS = 450
+const STAGGER_MS = 90
 const MIN_PIECE = 20
 const MAX_PIECE = 48
 const CARRY_NOTE_MS = 8000
 
+type ShardTarget = 'note' | 'bar' | 'jar'
+
+interface Shard {
+  target: ShardTarget
+  size: number
+  delay: number
+}
+
 const dayProgress = useTemplateRef<InstanceType<typeof DayProgress>>('dayProgress')
+const debtJar = useTemplateRef<InstanceType<typeof DebtJar>>('debtJar')
 const timerPanel = useTemplateRef<InstanceType<typeof TimerPanel>>('timerPanel')
-const piece = useTemplateRef<HTMLElement>('piece')
+const shardEls = useTemplateRef<HTMLElement[]>('shard')
 
 const settledMs = ref(0)
-const flying = ref(false)
-const landing = ref(false)
-const pieceSize = ref(MIN_PIECE)
+const settledDebtMs = ref(0)
+const shards = ref<Shard[]>([])
+const barLanding = ref(false)
+const jarLanding = ref(false)
 const carriedMs = ref(0)
 const carriedToYesterday = ref(true)
-let landingTimer: ReturnType<typeof setTimeout> | undefined
+
+let barTimer: ReturnType<typeof setTimeout> | undefined
+let jarTimer: ReturnType<typeof setTimeout> | undefined
 let carryTimer: ReturnType<typeof setTimeout> | undefined
 let pendingCarry = { ms: 0, toYesterday: true }
 
 const showDay = computed(() => timer.status === 'stopped' && sessions.loaded)
+const showJar = computed(() => showDay.value && settledDebtMs.value > 0)
 
 function prefersReducedMotion() {
   return window.matchMedia('(prefers-reduced-motion: reduce)').matches
 }
 
-function land() {
+function settle() {
   settledMs.value = sessions.todayMs
-  landing.value = true
-  clearTimeout(landingTimer)
-  landingTimer = setTimeout(() => (landing.value = false), LANDING_MS)
+  settledDebtMs.value = sessions.debtMs
+}
+
+function pulse(target: ShardTarget) {
+  if (target === 'bar') {
+    settledMs.value = sessions.todayMs
+    barLanding.value = true
+    clearTimeout(barTimer)
+    barTimer = setTimeout(() => (barLanding.value = false), LANDING_MS)
+    return
+  }
+
+  if (target === 'jar') {
+    settledDebtMs.value = sessions.debtMs
+    jarLanding.value = true
+    clearTimeout(jarTimer)
+    jarTimer = setTimeout(() => (jarLanding.value = false), LANDING_MS)
+    return
+  }
 
   carriedMs.value = pendingCarry.ms
   carriedToYesterday.value = pendingCarry.toYesterday
   clearTimeout(carryTimer)
-  if (pendingCarry.ms > 0) {
-    carryTimer = setTimeout(() => (carriedMs.value = 0), CARRY_NOTE_MS)
-  }
+  carryTimer = setTimeout(() => (carriedMs.value = 0), CARRY_NOTE_MS)
 }
 
 function measureCarry(session: Session) {
@@ -96,29 +125,45 @@ function measureCarry(session: Session) {
   }
 }
 
-async function fly(todayMs: number) {
-  if (todayMs <= 0) {
-    land()
+function shardSize(ms: number) {
+  const share = sessions.goalMs > 0 ? Math.min(1, ms / sessions.goalMs) : 1
+  return Math.round(MIN_PIECE + share * (MAX_PIECE - MIN_PIECE))
+}
+
+function planFlight(session: Session): Shard[] {
+  const capped = (ms: number) => (sessions.goalMs > 0 ? Math.min(ms, sessions.goalMs) : 0)
+
+  const shares: [ShardTarget, number][] = [
+    ['note', pendingCarry.ms],
+    ['bar', Math.max(0, capped(sessions.todayMs) - capped(settledMs.value))],
+    ['jar', Math.max(0, settledDebtMs.value - sessions.debtMs)],
+  ]
+
+  const planned = shares.filter(([, ms]) => ms > 0)
+  if (planned.length === 0) planned.push(['bar', session.focusedByDay[sessions.today] ?? 0])
+
+  return planned.map(([target, ms], index) => ({
+    target,
+    size: shardSize(ms),
+    delay: index * STAGGER_MS,
+  }))
+}
+
+function targetRect(target: ShardTarget) {
+  if (target === 'bar') return dayProgress.value?.bar?.getBoundingClientRect()
+  if (target === 'jar') return debtJar.value?.jar?.getBoundingClientRect()
+  return dayProgress.value?.note?.getBoundingClientRect()
+}
+
+async function glide(shard: Shard, el: HTMLElement | undefined, from: DOMRect) {
+  const to = targetRect(shard.target)
+
+  if (el == null || to === undefined) {
+    pulse(shard.target)
     return
   }
 
-  const share = sessions.goalMs > 0 ? Math.min(1, todayMs / sessions.goalMs) : 1
-  pieceSize.value = Math.round(MIN_PIECE + share * (MAX_PIECE - MIN_PIECE))
-
-  flying.value = true
-  await nextTick()
-
-  const from = timerPanel.value?.clock?.getBoundingClientRect()
-  const to = dayProgress.value?.bar?.getBoundingClientRect()
-  const el = piece.value
-
-  if (from === undefined || to === undefined || el == null || prefersReducedMotion()) {
-    flying.value = false
-    land()
-    return
-  }
-
-  const size = pieceSize.value
+  const size = shard.size
   const startX = from.left + from.width / 2 - size / 2
   const startY = from.top + from.height / 2 - size / 2
   const endX = to.left + to.width / 2 - size / 2
@@ -133,24 +178,51 @@ async function fly(todayMs: number) {
       { transform: `translate(${peakX}px, ${peakY}px) scale(1.12)`, opacity: 1, offset: 0.58 },
       { transform: `translate(${endX}px, ${endY}px) scale(0.24)`, opacity: 0.9 },
     ],
-    { duration: FLIGHT_MS, easing: 'cubic-bezier(0.32, 0, 0.35, 1)' },
+    {
+      duration: FLIGHT_MS,
+      delay: shard.delay,
+      fill: 'backwards',
+      easing: 'cubic-bezier(0.32, 0, 0.35, 1)',
+    },
   ).finished
 
-  flying.value = false
-  land()
+  pulse(shard.target)
+}
+
+async function fly(session: Session) {
+  measureCarry(session)
+  if (pendingCarry.ms === 0) carriedMs.value = 0
+
+  const plan = planFlight(session)
+  shards.value = plan
+  await nextTick()
+
+  const from = timerPanel.value?.clock?.getBoundingClientRect()
+
+  if (from === undefined || prefersReducedMotion()) {
+    shards.value = []
+    for (const shard of plan) pulse(shard.target)
+    settle()
+    return
+  }
+
+  const els = shardEls.value ?? []
+  await Promise.all(plan.map((shard, index) => glide(shard, els[index], from)))
+
+  shards.value = []
+  settle()
 }
 
 watch(
   () => sessions.lastFinished,
   (session) => {
-    if (session === null) return
-    measureCarry(session)
-    void fly(session.focusedByDay[sessions.today] ?? 0)
+    if (session !== null) void fly(session)
   },
 )
 
 onUnmounted(() => {
-  clearTimeout(landingTimer)
+  clearTimeout(barTimer)
+  clearTimeout(jarTimer)
   clearTimeout(carryTimer)
 })
 // #endregion
@@ -172,9 +244,26 @@ onUnmounted(() => {
         :streak-days="sessions.streak.days"
         :value-ms="settledMs"
         :goal-ms="sessions.goalMs"
-        :landing="landing"
+        :landing="barLanding"
         :carried-ms="carriedMs"
         :carried-to-yesterday="carriedToYesterday"
+      />
+    </Transition>
+
+    <!-- Debt jar -->
+    <Transition
+      enter-active-class="transition duration-300 ease-out motion-reduce:transition-none"
+      leave-active-class="transition duration-500 ease-in motion-reduce:transition-none"
+      enter-from-class="opacity-0"
+      leave-to-class="-translate-y-3 scale-90 opacity-0"
+    >
+      <DebtJar
+        v-if="showJar"
+        ref="debtJar"
+        class="absolute top-5 right-5"
+        :debt-ms="settledDebtMs"
+        :days-left="sessions.debtDaysLeft"
+        :landing="jarLanding"
       />
     </Transition>
 
@@ -187,12 +276,18 @@ onUnmounted(() => {
     <!-- Pet -->
     <PetCompanion :state="petState" :size="150" mirror class="absolute right-5 bottom-5" />
 
-    <!-- The session flying into the bar -->
+    <!-- The session flying to where it counts -->
     <span
-      v-if="flying"
-      ref="piece"
-      class="pointer-events-none fixed top-0 left-0 z-40 rounded-full bg-accent shadow-[0_0_24px_-2px_var(--color-accent)]"
-      :style="{ width: `${pieceSize}px`, height: `${pieceSize}px` }"
+      v-for="(shard, index) in shards"
+      :key="index"
+      ref="shard"
+      class="pointer-events-none fixed top-0 left-0 z-40 rounded-full opacity-0"
+      :class="
+        shard.target === 'jar'
+          ? 'bg-info shadow-[0_0_24px_-2px_var(--color-info)]'
+          : 'bg-accent shadow-[0_0_24px_-2px_var(--color-accent)]'
+      "
+      :style="{ width: `${shard.size}px`, height: `${shard.size}px` }"
     />
   </section>
 </template>

@@ -2,6 +2,7 @@ import { daysBetween, shiftDay } from '@/utils/day'
 
 export const DEBT_CAP_MS = 3 * 60 * 60 * 1000
 export const DEBT_CLOCK_DAYS = 7
+export const DEBT_WARN_DAYS = 4
 
 export interface StreakInput {
   dailyTotals: ReadonlyMap<string, number>

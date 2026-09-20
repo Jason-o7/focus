@@ -12,6 +12,7 @@ const props = defineProps<{
 }>()
 
 const bar = useTemplateRef<HTMLElement>('bar')
+const note = useTemplateRef<HTMLElement>('note')
 
 const fraction = computed(() => {
   if (props.goalMs <= 0) return 1
@@ -23,7 +24,7 @@ const reached = computed(() => fraction.value >= 1)
 const countedMs = computed(() => (reached.value ? props.goalMs : props.valueMs))
 const extraMs = computed(() => Math.max(0, props.valueMs - props.goalMs))
 
-defineExpose({ bar })
+defineExpose({ bar, note })
 </script>
 
 <template>
@@ -46,7 +47,7 @@ defineExpose({ bar })
     <div class="flex flex-col items-center gap-1.5">
       <div
         ref="bar"
-        class="day-bar h-2 w-64 overflow-hidden rounded-full bg-surface"
+        class="day-bar h-2.5 w-64 overflow-hidden rounded-full bg-surface-elevated shadow-[inset_0_0_0_1px_var(--color-border)]"
         :class="landing ? 'day-bar-landing' : ''"
         role="progressbar"
         :aria-valuemin="0"
@@ -61,7 +62,13 @@ defineExpose({ bar })
         />
       </div>
       <div class="flex flex-col items-center gap-0.5">
-        <p class="text-tiny text-text-muted">
+        <p v-if="goalMs <= 0" class="text-tiny text-text-muted">Rest day, nothing to reach</p>
+
+        <p v-else-if="valueMs <= 0" class="text-tiny text-text-muted">
+          <b class="font-semibold text-text-secondary">{{ formatMinutes(goalMs) }}</b> to go today
+        </p>
+
+        <p v-else class="text-tiny text-text-muted">
           <b class="font-semibold" :class="reached ? 'text-success' : 'text-text-secondary'">{{
             formatMinutes(countedMs)
           }}</b>
@@ -90,6 +97,8 @@ defineExpose({ bar })
             counted for {{ carriedToYesterday ? 'yesterday' : 'earlier days' }}
           </p>
         </Transition>
+
+        <span ref="note" class="block size-0" />
       </div>
     </div>
   </div>

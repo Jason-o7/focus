@@ -3,7 +3,7 @@ import { computed, ref } from 'vue'
 import { repo } from '@/api'
 import { useSettingsStore } from '@/stores/settings'
 import type { Session } from '@/types/session'
-import { startOfNextDay, todayKey } from '@/utils/day'
+import { daysBetween, startOfNextDay, todayKey } from '@/utils/day'
 import { computeStreak } from '@/utils/streak'
 
 export const useSessionsStore = defineStore('sessions', () => {
@@ -40,6 +40,21 @@ export const useSessionsStore = defineStore('sessions', () => {
   const streak = computed(() =>
     computeStreak({ dailyTotals: dailyTotals.value, goalMs: goalMs.value, today: today.value }),
   )
+
+  const todaySurplusMs = computed(() =>
+    goalMs.value > 0 ? Math.max(0, todayMs.value - goalMs.value) : 0,
+  )
+
+  const debtMs = computed(() => Math.max(0, streak.value.debtMs - todaySurplusMs.value))
+
+  const debtDaysLeft = computed(() => {
+    if (debtMs.value <= 0) return null
+
+    const deadline = streak.value.debtDeadline
+    if (deadline === null) return null
+
+    return Math.max(0, daysBetween(today.value, deadline))
+  })
   // #endregion
 
   // #region Midnight
@@ -105,6 +120,9 @@ export const useSessionsStore = defineStore('sessions', () => {
     goalMs,
     goalReached,
     streak,
+    todaySurplusMs,
+    debtMs,
+    debtDaysLeft,
     load,
     add,
     has,
