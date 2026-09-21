@@ -4,6 +4,7 @@ import FlipClock from '@/components/FlipClock.vue'
 import { useSettingsStore } from '@/stores/settings'
 import { useTimerStore } from '@/stores/timer'
 import type { TimerPhase } from '@/types/timer'
+import { playOvertime, scheduleOvertime, type CueHandle } from '@/utils/cues'
 import { formatDuration, formatMinutes } from '@/utils/duration'
 import DurationOverlay from '@/views/home/DurationOverlay.vue'
 
@@ -48,26 +49,97 @@ const overlayTarget = ref<TimerPhase | null>(null)
 // #endregion
 
 // #region Reaching the target
-const CELEBRATION_MS = 500
+const CELEBRATION_MS = 700
+const AFTERGLOW_MS = 30000
 
 const FRESH_CROSSING_MS = 2000
+const HIDDEN_CROSSING_MS = 90000
 
 const celebrating = ref(false)
+const afterglow = ref(false)
+
 let celebrationTimer: ReturnType<typeof setTimeout> | undefined
+let afterglowTimer: ReturnType<typeof setTimeout> | undefined
+let booked: CueHandle | null = null
+let waitingForTab = false
+
+function stopCelebrating() {
+  clearTimeout(celebrationTimer)
+  clearTimeout(afterglowTimer)
+  celebrating.value = false
+  afterglow.value = false
+}
+
+/** The cue is handed to the audio clock now, which runs whether or not the tab is watched. */
+function bookCue() {
+  booked?.cancel()
+  booked = null
+
+  if (timer.status !== 'running') return
+
+  const left = timer.remainingMs
+  if (left === null || left <= 0) return
+
+  booked = scheduleOvertime(left / 1000)
+}
+
+function celebrate() {
+  // Running out of a break is not bonus time
+  if (timer.phase !== 'focus') return
+
+  clearTimeout(celebrationTimer)
+  clearTimeout(afterglowTimer)
+
+  celebrating.value = true
+  afterglow.value = true
+
+  celebrationTimer = setTimeout(() => (celebrating.value = false), CELEBRATION_MS)
+  afterglowTimer = setTimeout(() => (afterglow.value = false), AFTERGLOW_MS)
+}
+
+function celebrateOnReturn() {
+  if (document.hidden || !waitingForTab) return
+
+  waitingForTab = false
+  celebrate()
+}
+
+watch(() => [timer.status, timer.phase, timer.targetMs], bookCue, { immediate: true })
 
 watch(
   () => timer.isOvertime,
   (over) => {
-    if (!over) return
-    if (Math.abs(timer.remainingMs ?? 0) > FRESH_CROSSING_MS) return
+    if (!over) {
+      waitingForTab = false
+      stopCelebrating()
+      return
+    }
 
-    clearTimeout(celebrationTimer)
-    celebrating.value = true
-    celebrationTimer = setTimeout(() => (celebrating.value = false), CELEBRATION_MS)
+    // A booked cue already sounded at the crossing itself; without one, it sounds late or never
+    if (booked === null) playOvertime()
+    booked = null
+
+    const since = Math.abs(timer.remainingMs ?? 0)
+
+    // A hidden tab ticks as slowly as once a minute, so the crossing is seen late
+    if (document.hidden) {
+      if (since <= HIDDEN_CROSSING_MS) waitingForTab = true
+      return
+    }
+
+    if (since > FRESH_CROSSING_MS) return
+    celebrate()
   },
 )
 
-onUnmounted(() => clearTimeout(celebrationTimer))
+document.addEventListener('visibilitychange', celebrateOnReturn)
+
+onUnmounted(() => {
+  clearTimeout(celebrationTimer)
+  clearTimeout(afterglowTimer)
+  booked?.cancel()
+  document.removeEventListener('visibilitychange', celebrateOnReturn)
+})
 // #endregion
 
 const clock = useTemplateRef<HTMLElement>('clock')
@@ -149,7 +221,7 @@ const DURATION_BUTTON =
 
     <!-- Clock -->
     <div ref="clock"
-      class="relative font-clock text-clock leading-[1.15] tracking-[0.04em] transition-colors duration-200 motion-reduce:transition-none"
+      class="relative isolate font-clock text-clock leading-[1.15] tracking-[0.04em] transition-colors duration-200 motion-reduce:transition-none"
       :class="[clockColor, celebrating ? 'clock-pop' : '']">
       <!-- Clock - Overtime sign -->
       <span v-if="timer.isOvertime"
@@ -158,8 +230,15 @@ const DURATION_BUTTON =
       </span>
 
       <!-- Clock - Reaching the target -->
-      <span v-if="celebrating"
-        class="clock-burst pointer-events-none absolute -inset-y-3 -inset-x-6 rounded-full border-2 border-accent" />
+      <span v-if="afterglow"
+        class="clock-afterglow pointer-events-none absolute -inset-x-16 -inset-y-10 -z-10 rounded-full" />
+
+      <template v-if="celebrating">
+        <span
+          class="clock-burst pointer-events-none absolute -inset-x-6 -inset-y-3 rounded-full border-2 border-accent" />
+        <span
+          class="clock-burst clock-burst-late pointer-events-none absolute -inset-x-6 -inset-y-3 rounded-full border-2 border-accent" />
+      </template>
 
       <FlipClock :value="clockText" />
     </div>
@@ -216,11 +295,44 @@ const DURATION_BUTTON =
 
 <style scoped>
 .clock-pop {
-  animation: clock-pop 500ms cubic-bezier(0.34, 1.56, 0.64, 1);
+  animation: clock-pop 700ms cubic-bezier(0.22, 1.4, 0.36, 1);
 }
 
 .clock-burst {
-  animation: clock-burst 500ms ease-out forwards;
+  animation: clock-burst 700ms ease-out forwards;
+}
+
+.clock-burst-late {
+  animation-delay: 140ms;
+  opacity: 0;
+}
+
+.clock-afterglow {
+  background: radial-gradient(
+    closest-side,
+    color-mix(in srgb, var(--color-accent) 60%, transparent),
+    transparent 72%
+  );
+  filter: blur(10px);
+  animation: clock-afterglow 30000ms linear forwards;
+}
+
+@keyframes clock-afterglow {
+  0% {
+    opacity: 1;
+  }
+
+  12% {
+    opacity: 0.5;
+  }
+
+  45% {
+    opacity: 0.24;
+  }
+
+  100% {
+    opacity: 0;
+  }
 }
 
 .break-offer {
@@ -231,25 +343,28 @@ const DURATION_BUTTON =
 @keyframes clock-pop {
   0% {
     transform: scale(1);
+    text-shadow: none;
   }
 
-  45% {
-    transform: scale(1.07);
+  16% {
+    transform: scale(1.13);
+    text-shadow: 0 0 30px color-mix(in srgb, var(--color-accent) 95%, transparent);
   }
 
   100% {
     transform: scale(1);
+    text-shadow: none;
   }
 }
 
 @keyframes clock-burst {
   from {
-    transform: scale(0.92);
-    opacity: 0.85;
+    transform: scale(0.9);
+    opacity: 1;
   }
 
   to {
-    transform: scale(1.3);
+    transform: scale(1.45);
     opacity: 0;
   }
 }
@@ -274,7 +389,8 @@ const DURATION_BUTTON =
     animation: none;
   }
 
-  .clock-burst {
+  .clock-burst,
+  .clock-afterglow {
     display: none;
   }
 }

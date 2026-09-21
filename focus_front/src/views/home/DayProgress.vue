@@ -21,6 +21,8 @@ const fraction = computed(() => {
 
 const reached = computed(() => fraction.value >= 1)
 
+const sealed = computed(() => props.goalMs > 0 && reached.value)
+
 const countedMs = computed(() => (reached.value ? props.goalMs : props.valueMs))
 const extraMs = computed(() => Math.max(0, props.valueMs - props.goalMs))
 
@@ -45,21 +47,49 @@ defineExpose({ bar, note })
 
     <!-- Goal -->
     <div class="flex flex-col items-center gap-1.5">
-      <div
-        ref="bar"
-        class="day-bar h-2.5 w-64 overflow-hidden rounded-full bg-surface-elevated shadow-[inset_0_0_0_1px_var(--color-border)]"
-        :class="landing ? 'day-bar-landing' : ''"
-        role="progressbar"
-        :aria-valuemin="0"
-        :aria-valuemax="goalMs"
-        :aria-valuenow="valueMs"
-        aria-label="Today's goal"
-      >
+      <div class="relative">
         <div
-          class="h-full rounded-full transition-[width] duration-500 ease-out motion-reduce:transition-none"
-          :class="reached ? 'bg-success' : 'bg-accent'"
-          :style="{ width: `${fraction * 100}%` }"
-        />
+          ref="bar"
+          class="day-bar h-2.5 w-64 overflow-hidden rounded-full bg-surface-elevated shadow-[inset_0_0_0_1px_var(--color-border)]"
+          :class="landing ? 'day-bar-landing' : ''"
+          role="progressbar"
+          :aria-valuemin="0"
+          :aria-valuemax="goalMs"
+          :aria-valuenow="valueMs"
+          aria-label="Today's goal"
+        >
+          <div
+            class="h-full rounded-full transition-[width] duration-500 ease-out motion-reduce:transition-none"
+            :class="reached ? 'bg-success' : 'bg-accent'"
+            :style="{ width: `${fraction * 100}%` }"
+          />
+        </div>
+
+        <!-- Goal - Seal for the day -->
+        <Transition
+          enter-active-class="seal-in motion-reduce:animate-none"
+          leave-active-class="transition duration-200 ease-in motion-reduce:transition-none"
+          leave-to-class="scale-50 opacity-0"
+        >
+          <div
+            v-if="sealed"
+            class="seal absolute top-1/2 -right-3 flex size-7 -translate-y-1/2 items-center justify-center rounded-full bg-success text-background"
+            role="img"
+            aria-label="Goal reached today"
+          >
+            <svg
+              class="size-4"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="3.5"
+              stroke-linecap="round"
+              stroke-linejoin="round"
+            >
+              <path d="m5 13 4 4L19 7" />
+            </svg>
+          </div>
+        </Transition>
       </div>
       <div class="flex flex-col items-center gap-0.5">
         <p v-if="goalMs <= 0" class="text-tiny text-text-muted">Rest day, nothing to reach</p>
@@ -105,6 +135,59 @@ defineExpose({ bar, note })
 </template>
 
 <style scoped>
+.seal {
+  box-shadow:
+    0 0 0 3px var(--color-background),
+    0 0 16px -1px color-mix(in srgb, var(--color-success) 95%, transparent);
+}
+
+.seal::after {
+  content: '';
+  position: absolute;
+  inset: -3px;
+  border-radius: 9999px;
+  border: 1.5px solid var(--color-success);
+  animation: seal-ping 3200ms ease-out infinite;
+}
+
+.seal-in {
+  animation: seal-in 640ms cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+@keyframes seal-in {
+  0% {
+    transform: translateY(-110%) scale(0.2) rotate(-35deg);
+    opacity: 0;
+  }
+
+  45% {
+    transform: translateY(0) scale(1.45) rotate(6deg);
+    opacity: 1;
+  }
+
+  100% {
+    transform: none;
+    opacity: 1;
+  }
+}
+
+@keyframes seal-ping {
+  0% {
+    transform: scale(0.92);
+    opacity: 0.75;
+  }
+
+  55% {
+    transform: scale(1.75);
+    opacity: 0;
+  }
+
+  100% {
+    transform: scale(1.75);
+    opacity: 0;
+  }
+}
+
 .day-bar-landing {
   animation: day-bar-hit 420ms ease-out;
 }
@@ -125,7 +208,8 @@ defineExpose({ bar, note })
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .day-bar-landing {
+  .day-bar-landing,
+  .seal::after {
     animation: none;
   }
 }

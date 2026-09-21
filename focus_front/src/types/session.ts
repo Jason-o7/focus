@@ -9,3 +9,9 @@ export interface Session {
   focusedMs: number
   focusedByDay: Record<string, number>
 }
+
+/** One row of the extra time tower: a day and how far past the goal it went. */
+export interface ExtraDay {
+  day: string
+  extraMs: number
+}

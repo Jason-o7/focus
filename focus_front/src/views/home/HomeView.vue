@@ -8,11 +8,14 @@ import { useSettingsStore } from '@/stores/settings'
 import { useSoundsStore } from '@/stores/sounds'
 import { useTimerStore } from '@/stores/timer'
 import type { PetState } from '@/types/pet'
-import type { Session } from '@/types/session'
+import type { ExtraDay, Session } from '@/types/session'
 import type { TimerStatus } from '@/types/timer'
+import { playGoalPassed, playGoalReached } from '@/utils/cues'
 import { shiftDay } from '@/utils/day'
+import { MINUTE_MS } from '@/utils/duration'
 import DayProgress from '@/views/home/DayProgress.vue'
 import DebtJar from '@/views/home/DebtJar.vue'
+import ExtraTower from '@/views/home/ExtraTower.vue'
 import SettingsCard from '@/views/home/SettingsCard.vue'
 import TimerPanel from '@/views/home/TimerPanel.vue'
 
@@ -55,7 +58,7 @@ const MIN_PIECE = 20
 const MAX_PIECE = 48
 const CARRY_NOTE_MS = 8000
 
-type ShardTarget = 'note' | 'bar' | 'jar'
+type ShardTarget = 'note' | 'bar' | 'tower' | 'jar'
 
 interface Shard {
   target: ShardTarget
@@ -65,24 +68,37 @@ interface Shard {
 
 const dayProgress = useTemplateRef<InstanceType<typeof DayProgress>>('dayProgress')
 const debtJar = useTemplateRef<InstanceType<typeof DebtJar>>('debtJar')
+const extraTower = useTemplateRef<InstanceType<typeof ExtraTower>>('extraTower')
 const timerPanel = useTemplateRef<InstanceType<typeof TimerPanel>>('timerPanel')
 const shardEls = useTemplateRef<HTMLElement[]>('shard')
 
 const settledMs = ref(0)
 const settledDebtMs = ref(0)
+const settledDays = ref<ExtraDay[]>([])
 const shards = ref<Shard[]>([])
 const barLanding = ref(false)
 const jarLanding = ref(false)
+const towerLanding = ref(false)
 const carriedMs = ref(0)
 const carriedToYesterday = ref(true)
 
+const SPECIAL_SPREAD_MS = 120 * MINUTE_MS
+
 let barTimer: ReturnType<typeof setTimeout> | undefined
+let towerTimer: ReturnType<typeof setTimeout> | undefined
 let jarTimer: ReturnType<typeof setTimeout> | undefined
 let carryTimer: ReturnType<typeof setTimeout> | undefined
 let pendingCarry = { ms: 0, toYesterday: true }
+let before = { todayMs: 0, extraMs: 0 }
 
 const showDay = computed(() => timer.status === 'stopped' && sessions.loaded)
 const showJar = computed(() => showDay.value && settledDebtMs.value > 0)
+const showTower = computed(
+  () =>
+    showDay.value &&
+    (settledDays.value.some((row) => row.extraMs > 0) ||
+      shards.value.some((shard) => shard.target === 'tower')),
+)
 
 function prefersReducedMotion() {
   return window.matchMedia('(prefers-reduced-motion: reduce)').matches
@@ -91,14 +107,39 @@ function prefersReducedMotion() {
 function settle() {
   settledMs.value = sessions.todayMs
   settledDebtMs.value = sessions.debtMs
+  settledDays.value = sessions.extraDays
 }
 
 function pulse(target: ShardTarget) {
   if (target === 'bar') {
+    const wasReached = sessions.goalMs > 0 && before.todayMs >= sessions.goalMs
+    const wasSpecial = sessions.specialTargetMs > 0 && before.todayMs >= sessions.specialTargetMs
+
     settledMs.value = sessions.todayMs
     barLanding.value = true
     clearTimeout(barTimer)
     barTimer = setTimeout(() => (barLanding.value = false), LANDING_MS)
+
+    // The bells of the tower win over the drop when both would land
+    if (!wasReached && sessions.goalReached && !(!wasSpecial && sessions.specialReached)) {
+      playGoalReached()
+    }
+
+    return
+  }
+
+  if (target === 'tower') {
+    const wasSpecial = sessions.specialTargetMs > 0 && before.todayMs >= sessions.specialTargetMs
+
+    settledDays.value = sessions.extraDays
+    towerLanding.value = true
+    clearTimeout(towerTimer)
+    towerTimer = setTimeout(() => (towerLanding.value = false), LANDING_MS)
+
+    if (!wasSpecial && sessions.specialReached) {
+      playGoalPassed((sessions.todayMs - sessions.specialTargetMs) / SPECIAL_SPREAD_MS)
+    }
+
     return
   }
 
@@ -135,7 +176,8 @@ function planFlight(session: Session): Shard[] {
 
   const shares: [ShardTarget, number][] = [
     ['note', pendingCarry.ms],
-    ['bar', Math.max(0, capped(sessions.todayMs) - capped(settledMs.value))],
+    ['bar', Math.max(0, capped(sessions.todayMs) - capped(before.todayMs))],
+    ['tower', Math.max(0, (sessions.extraDays[0]?.extraMs ?? 0) - before.extraMs)],
     ['jar', Math.max(0, settledDebtMs.value - sessions.debtMs)],
   ]
 
@@ -151,6 +193,7 @@ function planFlight(session: Session): Shard[] {
 
 function targetRect(target: ShardTarget) {
   if (target === 'bar') return dayProgress.value?.bar?.getBoundingClientRect()
+  if (target === 'tower') return extraTower.value?.tower?.getBoundingClientRect()
   if (target === 'jar') return debtJar.value?.jar?.getBoundingClientRect()
   return dayProgress.value?.note?.getBoundingClientRect()
 }
@@ -190,6 +233,7 @@ async function glide(shard: Shard, el: HTMLElement | undefined, from: DOMRect) {
 }
 
 async function fly(session: Session) {
+  before = { todayMs: settledMs.value, extraMs: settledDays.value[0]?.extraMs ?? 0 }
   measureCarry(session)
   if (pendingCarry.ms === 0) carriedMs.value = 0
 
@@ -220,8 +264,16 @@ watch(
   },
 )
 
+watch(
+  () => sessions.today,
+  () => {
+    if (shards.value.length === 0) settle()
+  },
+)
+
 onUnmounted(() => {
   clearTimeout(barTimer)
+  clearTimeout(towerTimer)
   clearTimeout(jarTimer)
   clearTimeout(carryTimer)
 })
@@ -264,6 +316,22 @@ onUnmounted(() => {
         :debt-ms="settledDebtMs"
         :days-left="sessions.debtDaysLeft"
         :landing="jarLanding"
+      />
+    </Transition>
+
+    <!-- Extra time tower -->
+    <Transition
+      enter-active-class="transition duration-300 ease-out motion-reduce:transition-none"
+      leave-active-class="transition duration-200 ease-in motion-reduce:transition-none"
+      enter-from-class="translate-x-3 opacity-0"
+      leave-to-class="translate-x-3 opacity-0"
+    >
+      <ExtraTower
+        v-if="showTower"
+        ref="extraTower"
+        class="absolute top-1/2 right-5 -translate-y-1/2"
+        :days="settledDays"
+        :landing="towerLanding"
       />
     </Transition>
 

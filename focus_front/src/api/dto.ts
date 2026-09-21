@@ -132,16 +132,29 @@ const FUTURE_TOLERANCE_MS = 60_000
 
 const DAY_KEY = /^\d{4}-\d{2}-\d{2}$/
 
-function toDayTotals(raw: unknown, day: string, fallbackMs: number): Record<string, number> {
+const DAY_TOTAL_TOLERANCE_MS = 1000
+
+function toDayTotals(
+  raw: unknown,
+  day: string,
+  fallbackMs: number,
+  capMs: number | null = null,
+): Record<string, number> {
   const totals: Record<string, number> = {}
+  let sum = 0
 
   if (isRecord(raw)) {
     for (const [key, ms] of Object.entries(raw)) {
-      if (DAY_KEY.test(key) && isNonNegativeMs(ms)) totals[key] = ms
+      if (DAY_KEY.test(key) && isNonNegativeMs(ms)) {
+        totals[key] = ms
+        sum += ms
+      }
     }
   }
 
-  if (Object.keys(totals).length > 0) return totals
+  // Days adding up to more than the session itself would poison the goal, the streak and the debt
+  const fits = capMs === null || sum <= capMs + DAY_TOTAL_TOLERANCE_MS
+  if (Object.keys(totals).length > 0 && fits) return totals
 
   return fallbackMs > 0 ? { [day]: fallbackMs } : {}
 }
@@ -205,7 +218,12 @@ export function toSession(raw: unknown, at: number = Date.now()): Session | null
     startedAt: raw.startedAt,
     endedAt: raw.endedAt,
     focusedMs: raw.focusedMs,
-    focusedByDay: toDayTotals(raw.focusedByDay, dayKey(raw.startedAt), raw.focusedMs),
+    focusedByDay: toDayTotals(
+      raw.focusedByDay,
+      dayKey(raw.startedAt),
+      raw.focusedMs,
+      raw.focusedMs,
+    ),
   }
 }
 

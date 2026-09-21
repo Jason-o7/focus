@@ -65,13 +65,18 @@ export const useSettingsStore = defineStore('settings', () => {
     }
   }
 
-  async function persist() {
+  /** Changes and writes, or puts back what was there. The screen never claims a write that failed. */
+  async function change(mutate: () => void) {
     if (!canEdit.value) return
+
+    const previous = snapshot()
+    mutate()
 
     try {
       await repo().settings.save(snapshot())
       saveFailed.value = false
     } catch {
+      apply(previous)
       saveFailed.value = true
     }
   }
@@ -79,78 +84,62 @@ export const useSettingsStore = defineStore('settings', () => {
 
   // #region Actions
   async function selectSound(id: string) {
-    if (!canEdit.value) return
-    soundId.value = id
-    await persist()
+    await change(() => (soundId.value = id))
   }
 
   async function selectBackground(id: string) {
-    if (!canEdit.value) return
-    backgroundId.value = id
-    await persist()
+    await change(() => (backgroundId.value = id))
   }
 
   async function toggleEyeBreak() {
-    if (!canEdit.value) return
-    eyeBreakEnabled.value = !eyeBreakEnabled.value
-    await persist()
+    await change(() => (eyeBreakEnabled.value = !eyeBreakEnabled.value))
   }
 
   async function setEyeBreakMinutes(minutes: number) {
-    if (!canEdit.value) return
     if (!isValidEyeBreakMinutes(minutes)) return
-    eyeBreakMinutes.value = minutes
-    await persist()
+    await change(() => (eyeBreakMinutes.value = minutes))
   }
 
   async function addEyeBreakPreset(minutes: number) {
-    if (!canEdit.value) return
     if (!isValidEyeBreakMinutes(minutes)) return
     if (eyeBreakPresets.value.includes(minutes)) return
 
-    eyeBreakPresets.value = [...eyeBreakPresets.value, minutes].sort((a, b) => a - b)
-    await persist()
+    await change(() => {
+      eyeBreakPresets.value = [...eyeBreakPresets.value, minutes].sort((a, b) => a - b)
+    })
   }
 
   async function removeEyeBreakPreset(minutes: number) {
-    if (!canEdit.value) return
     if (eyeBreakPresets.value.length <= 1) return
+    if (!eyeBreakPresets.value.includes(minutes)) return
 
-    eyeBreakPresets.value = eyeBreakPresets.value.filter((value) => value !== minutes)
+    await change(() => {
+      eyeBreakPresets.value = eyeBreakPresets.value.filter((value) => value !== minutes)
 
-    const first = eyeBreakPresets.value[0]
-    if (first !== undefined && !eyeBreakPresets.value.includes(eyeBreakMinutes.value)) {
-      eyeBreakMinutes.value = first
-    }
-
-    await persist()
+      const first = eyeBreakPresets.value[0]
+      if (first !== undefined && !eyeBreakPresets.value.includes(eyeBreakMinutes.value)) {
+        eyeBreakMinutes.value = first
+      }
+    })
   }
 
   async function selectMode(value: TimerMode) {
-    if (!canEdit.value) return
-    mode.value = value
-    await persist()
+    await change(() => (mode.value = value))
   }
 
   async function setFocusMs(value: number) {
-    if (!canEdit.value) return
     if (!isValidFocusMs(value)) return
-    focusMs.value = value
-    await persist()
+    await change(() => (focusMs.value = value))
   }
 
   async function setDailyGoalMs(value: number) {
-    if (!canEdit.value) return
     if (!isValidGoalMs(value)) return
-    dailyGoalMs.value = value
-    await persist()
+    await change(() => (dailyGoalMs.value = value))
   }
 
   async function setBreakMs(value: number) {
-    if (!canEdit.value) return
     if (!isValidBreakMs(value)) return
-    breakMs.value = value
-    await persist()
+    await change(() => (breakMs.value = value))
   }
   // #endregion
 
