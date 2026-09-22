@@ -1,15 +1,24 @@
 <script setup lang="ts">
 import { computed, onUnmounted, ref, useTemplateRef, watch } from 'vue'
 import FlipClock from '@/components/FlipClock.vue'
+import { useNotificationsStore } from '@/stores/notifications'
 import { useSettingsStore } from '@/stores/settings'
 import { useTimerStore } from '@/stores/timer'
 import type { TimerPhase } from '@/types/timer'
-import { playOvertime, scheduleOvertime, type CueHandle } from '@/utils/cues'
 import { formatDuration, formatMinutes } from '@/utils/duration'
 import DurationOverlay from '@/views/home/DurationOverlay.vue'
 
 const settings = useSettingsStore()
 const timer = useTimerStore()
+const notifications = useNotificationsStore()
+
+// #region Starting
+function start() {
+  if (notifications.promptBeforeStart()) return
+
+  void timer.start()
+}
+// #endregion
 
 // #region Clock
 const isIdle = computed(() => timer.status === 'stopped')
@@ -60,7 +69,6 @@ const afterglow = ref(false)
 
 let celebrationTimer: ReturnType<typeof setTimeout> | undefined
 let afterglowTimer: ReturnType<typeof setTimeout> | undefined
-let booked: CueHandle | null = null
 let waitingForTab = false
 
 function stopCelebrating() {
@@ -68,19 +76,6 @@ function stopCelebrating() {
   clearTimeout(afterglowTimer)
   celebrating.value = false
   afterglow.value = false
-}
-
-/** The cue is handed to the audio clock now, which runs whether or not the tab is watched. */
-function bookCue() {
-  booked?.cancel()
-  booked = null
-
-  if (timer.status !== 'running') return
-
-  const left = timer.remainingMs
-  if (left === null || left <= 0) return
-
-  booked = scheduleOvertime(left / 1000)
 }
 
 function celebrate() {
@@ -104,8 +99,6 @@ function celebrateOnReturn() {
   celebrate()
 }
 
-watch(() => [timer.status, timer.phase, timer.targetMs], bookCue, { immediate: true })
-
 watch(
   () => timer.isOvertime,
   (over) => {
@@ -114,10 +107,6 @@ watch(
       stopCelebrating()
       return
     }
-
-    // A booked cue already sounded at the crossing itself; without one, it sounds late or never
-    if (booked === null) playOvertime()
-    booked = null
 
     const since = Math.abs(timer.remainingMs ?? 0)
 
@@ -137,7 +126,6 @@ document.addEventListener('visibilitychange', celebrateOnReturn)
 onUnmounted(() => {
   clearTimeout(celebrationTimer)
   clearTimeout(afterglowTimer)
-  booked?.cancel()
   document.removeEventListener('visibilitychange', celebrateOnReturn)
 })
 // #endregion
@@ -266,7 +254,7 @@ const DURATION_BUTTON =
         <button v-if="isIdle" type="button" :class="[
           ACTION_BUTTON,
           'border-transparent bg-accent text-background hover:bg-accent-hover disabled:cursor-not-allowed disabled:opacity-40',
-        ]" :disabled="!timer.canEdit" @click="timer.start()">
+        ]" :disabled="!timer.canEdit" @click="start()">
           Start focusing
         </button>
 

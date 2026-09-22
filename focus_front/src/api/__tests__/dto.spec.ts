@@ -88,4 +88,18 @@ describe('toSettings', () => {
     expect(settings.focusMs).toBe(DEFAULT_SETTINGS.focusMs)
     expect(settings.soundId).toBe('forest')
   })
+
+  it('keeps the notification kinds it knows and drops the rest', () => {
+    const settings = toSettings({
+      notifications: { timerEnd: true, eyeBreak: true, whatever: 'yes' },
+    })
+
+    expect(settings.notifications).toEqual({ timerEnd: true })
+  })
+
+  it('lands an unknown kind on its default', () => {
+    const settings = toSettings({ notifications: { timerEnd: 'yes' } })
+
+    expect(settings.notifications.timerEnd).toBe(DEFAULT_SETTINGS.notifications.timerEnd)
+  })
 })

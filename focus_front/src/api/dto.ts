@@ -1,4 +1,9 @@
 import type { Background } from '@/types/background'
+import {
+  DEFAULT_NOTIFICATIONS,
+  isNotificationKind,
+  type NotificationKind,
+} from '@/types/notification'
 import { DEFAULT_SETTINGS, type Settings } from '@/types/settings'
 import { isValidEyeBreakMinutes } from '@/utils/eyeBreak'
 import { isNonNegativeMs, isValidBreakMs, isValidFocusMs, isValidGoalMs } from '@/utils/duration'
@@ -28,6 +33,8 @@ export interface SettingsDto {
   focusMs: number
   breakMs: number
   dailyGoalMs: number
+  notifications: Record<string, boolean>
+  notificationPromptDismissed: boolean
 }
 
 export interface SessionDto {
@@ -94,6 +101,17 @@ function toMinuteList(raw: unknown, fallback: number[]): number[] {
   return [...new Set(minutes)].sort((a, b) => a - b)
 }
 
+function toNotifications(raw: unknown): Record<NotificationKind, boolean> {
+  const value = { ...DEFAULT_NOTIFICATIONS }
+  if (!isRecord(raw)) return value
+
+  for (const [kind, on] of Object.entries(raw)) {
+    if (isNotificationKind(kind) && typeof on === 'boolean') value[kind] = on
+  }
+
+  return value
+}
+
 export function toSettings(raw: unknown): Settings {
   if (!isRecord(raw)) return { ...DEFAULT_SETTINGS }
 
@@ -113,6 +131,11 @@ export function toSettings(raw: unknown): Settings {
     focusMs: isValidFocusMs(raw.focusMs) ? raw.focusMs : DEFAULT_SETTINGS.focusMs,
     breakMs: isValidBreakMs(raw.breakMs) ? raw.breakMs : DEFAULT_SETTINGS.breakMs,
     dailyGoalMs: isValidGoalMs(raw.dailyGoalMs) ? raw.dailyGoalMs : DEFAULT_SETTINGS.dailyGoalMs,
+    notifications: toNotifications(raw.notifications),
+    notificationPromptDismissed:
+      typeof raw.notificationPromptDismissed === 'boolean'
+        ? raw.notificationPromptDismissed
+        : DEFAULT_SETTINGS.notificationPromptDismissed,
   }
 }
 
@@ -245,6 +268,8 @@ export function toSettingsDto(value: Settings): SettingsDto {
     focusMs: value.focusMs,
     breakMs: value.breakMs,
     dailyGoalMs: value.dailyGoalMs,
+    notifications: { ...value.notifications },
+    notificationPromptDismissed: value.notificationPromptDismissed,
   }
 }
 

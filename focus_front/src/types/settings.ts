@@ -1,3 +1,4 @@
+import { DEFAULT_NOTIFICATIONS, type NotificationKind } from '@/types/notification'
 import type { TimerMode } from '@/types/timer'
 import { MINUTE_MS } from '@/utils/duration'
 
@@ -12,6 +13,8 @@ export interface Settings {
   focusMs: number
   breakMs: number
   dailyGoalMs: number
+  notifications: Record<NotificationKind, boolean>
+  notificationPromptDismissed: boolean
 }
 
 export const DEFAULT_SETTINGS: Settings = {
@@ -25,4 +28,6 @@ export const DEFAULT_SETTINGS: Settings = {
   breakMs: 5 * MINUTE_MS,
   // TODO: back to 2 * 60 * MINUTE_MS. Lowered to watch a session go past the bar.
   dailyGoalMs: 1 * MINUTE_MS,
+  notifications: { ...DEFAULT_NOTIFICATIONS },
+  notificationPromptDismissed: false,
 }

@@ -1,6 +1,7 @@
 import { defineStore } from 'pinia'
 import { computed, ref } from 'vue'
 import { repo } from '@/api'
+import type { NotificationKind } from '@/types/notification'
 import { DEFAULT_SETTINGS, type Settings } from '@/types/settings'
 import { isValidEyeBreakMinutes } from '@/utils/eyeBreak'
 import { isValidBreakMs, isValidFocusMs, isValidGoalMs } from '@/utils/duration'
@@ -17,6 +18,8 @@ export const useSettingsStore = defineStore('settings', () => {
   const focusMs = ref(DEFAULT_SETTINGS.focusMs)
   const breakMs = ref(DEFAULT_SETTINGS.breakMs)
   const dailyGoalMs = ref(DEFAULT_SETTINGS.dailyGoalMs)
+  const notifications = ref<Record<NotificationKind, boolean>>({ ...DEFAULT_SETTINGS.notifications })
+  const notificationPromptDismissed = ref(DEFAULT_SETTINGS.notificationPromptDismissed)
 
   const loaded = ref(false)
   const loadFailed = ref(false)
@@ -37,6 +40,8 @@ export const useSettingsStore = defineStore('settings', () => {
     focusMs.value = value.focusMs
     breakMs.value = value.breakMs
     dailyGoalMs.value = value.dailyGoalMs
+    notifications.value = { ...value.notifications }
+    notificationPromptDismissed.value = value.notificationPromptDismissed
   }
 
   function snapshot(): Settings {
@@ -50,6 +55,8 @@ export const useSettingsStore = defineStore('settings', () => {
       focusMs: focusMs.value,
       breakMs: breakMs.value,
       dailyGoalMs: dailyGoalMs.value,
+      notifications: { ...notifications.value },
+      notificationPromptDismissed: notificationPromptDismissed.value,
     }
   }
 
@@ -141,6 +148,14 @@ export const useSettingsStore = defineStore('settings', () => {
     if (!isValidBreakMs(value)) return
     await change(() => (breakMs.value = value))
   }
+
+  async function setNotification(kind: NotificationKind, enabled: boolean) {
+    await change(() => (notifications.value = { ...notifications.value, [kind]: enabled }))
+  }
+
+  async function dismissNotificationPrompt() {
+    await change(() => (notificationPromptDismissed.value = true))
+  }
   // #endregion
 
   return {
@@ -153,6 +168,8 @@ export const useSettingsStore = defineStore('settings', () => {
     focusMs,
     breakMs,
     dailyGoalMs,
+    notifications,
+    notificationPromptDismissed,
     loaded,
     loadFailed,
     saveFailed,
@@ -168,5 +185,7 @@ export const useSettingsStore = defineStore('settings', () => {
     setFocusMs,
     setBreakMs,
     setDailyGoalMs,
+    setNotification,
+    dismissNotificationPrompt,
   }
 })

@@ -2,9 +2,13 @@
 import { computed, ref, watch } from 'vue'
 import { RouterView } from 'vue-router'
 import AppSidebar from '@/components/AppSidebar.vue'
+import NotificationPrompt from '@/components/NotificationPrompt.vue'
+import { useNotificationsStore } from '@/stores/notifications'
 import { useTimerStore } from '@/stores/timer'
 
 const timer = useTimerStore()
+
+const notifications = useNotificationsStore()
 
 // TODO: remember this between reloads once api/ exists.
 const collapsed = ref(false)
@@ -50,5 +54,8 @@ watch(sessionActive, (active) => (collapsed.value = active))
     >
       <RouterView />
     </main>
+
+    <!-- Notifications prompt -->
+    <NotificationPrompt v-if="notifications.promptOpen" />
   </div>
 </template>
