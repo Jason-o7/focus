@@ -11,7 +11,6 @@ export const useSettingsStore = defineStore('settings', () => {
   // #region State
   const soundId = ref(DEFAULT_SETTINGS.soundId)
   const backgroundId = ref(DEFAULT_SETTINGS.backgroundId)
-  const eyeBreakEnabled = ref(DEFAULT_SETTINGS.eyeBreakEnabled)
   const eyeBreakMinutes = ref(DEFAULT_SETTINGS.eyeBreakMinutes)
   const eyeBreakPresets = ref<number[]>([...DEFAULT_SETTINGS.eyeBreakPresets])
   const mode = ref<TimerMode>(DEFAULT_SETTINGS.mode)
@@ -19,7 +18,9 @@ export const useSettingsStore = defineStore('settings', () => {
   const breakMs = ref(DEFAULT_SETTINGS.breakMs)
   const dailyGoalMs = ref(DEFAULT_SETTINGS.dailyGoalMs)
   const notifications = ref<Record<NotificationKind, boolean>>({ ...DEFAULT_SETTINGS.notifications })
-  const notificationPromptDismissed = ref(DEFAULT_SETTINGS.notificationPromptDismissed)
+  const promptsDismissed = ref<Record<NotificationKind, boolean>>({
+    ...DEFAULT_SETTINGS.promptsDismissed,
+  })
 
   const loaded = ref(false)
   const loadFailed = ref(false)
@@ -33,7 +34,6 @@ export const useSettingsStore = defineStore('settings', () => {
   function apply(value: Settings) {
     soundId.value = value.soundId
     backgroundId.value = value.backgroundId
-    eyeBreakEnabled.value = value.eyeBreakEnabled
     eyeBreakMinutes.value = value.eyeBreakMinutes
     eyeBreakPresets.value = [...value.eyeBreakPresets]
     mode.value = value.mode
@@ -41,14 +41,13 @@ export const useSettingsStore = defineStore('settings', () => {
     breakMs.value = value.breakMs
     dailyGoalMs.value = value.dailyGoalMs
     notifications.value = { ...value.notifications }
-    notificationPromptDismissed.value = value.notificationPromptDismissed
+    promptsDismissed.value = { ...value.promptsDismissed }
   }
 
   function snapshot(): Settings {
     return {
       soundId: soundId.value,
       backgroundId: backgroundId.value,
-      eyeBreakEnabled: eyeBreakEnabled.value,
       eyeBreakMinutes: eyeBreakMinutes.value,
       eyeBreakPresets: [...eyeBreakPresets.value],
       mode: mode.value,
@@ -56,7 +55,7 @@ export const useSettingsStore = defineStore('settings', () => {
       breakMs: breakMs.value,
       dailyGoalMs: dailyGoalMs.value,
       notifications: { ...notifications.value },
-      notificationPromptDismissed: notificationPromptDismissed.value,
+      promptsDismissed: { ...promptsDismissed.value },
     }
   }
 
@@ -96,10 +95,6 @@ export const useSettingsStore = defineStore('settings', () => {
 
   async function selectBackground(id: string) {
     await change(() => (backgroundId.value = id))
-  }
-
-  async function toggleEyeBreak() {
-    await change(() => (eyeBreakEnabled.value = !eyeBreakEnabled.value))
   }
 
   async function setEyeBreakMinutes(minutes: number) {
@@ -153,15 +148,14 @@ export const useSettingsStore = defineStore('settings', () => {
     await change(() => (notifications.value = { ...notifications.value, [kind]: enabled }))
   }
 
-  async function dismissNotificationPrompt() {
-    await change(() => (notificationPromptDismissed.value = true))
+  async function dismissPrompt(kind: NotificationKind) {
+    await change(() => (promptsDismissed.value = { ...promptsDismissed.value, [kind]: true }))
   }
   // #endregion
 
   return {
     soundId,
     backgroundId,
-    eyeBreakEnabled,
     eyeBreakMinutes,
     eyeBreakPresets,
     mode,
@@ -169,7 +163,7 @@ export const useSettingsStore = defineStore('settings', () => {
     breakMs,
     dailyGoalMs,
     notifications,
-    notificationPromptDismissed,
+    promptsDismissed,
     loaded,
     loadFailed,
     saveFailed,
@@ -177,7 +171,6 @@ export const useSettingsStore = defineStore('settings', () => {
     load,
     selectSound,
     selectBackground,
-    toggleEyeBreak,
     setEyeBreakMinutes,
     addEyeBreakPreset,
     removeEyeBreakPreset,
@@ -186,6 +179,6 @@ export const useSettingsStore = defineStore('settings', () => {
     setBreakMs,
     setDailyGoalMs,
     setNotification,
-    dismissNotificationPrompt,
+    dismissPrompt,
   }
 })

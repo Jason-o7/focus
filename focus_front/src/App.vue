@@ -3,12 +3,16 @@ import { computed, ref, watch } from 'vue'
 import { RouterView } from 'vue-router'
 import AppSidebar from '@/components/AppSidebar.vue'
 import NotificationPrompt from '@/components/NotificationPrompt.vue'
+import { useEyeBreakStore } from '@/stores/eyeBreak'
 import { useNotificationsStore } from '@/stores/notifications'
 import { useTimerStore } from '@/stores/timer'
 
 const timer = useTimerStore()
 
 const notifications = useNotificationsStore()
+
+// Both watch the session from outside the views, which <RouterView> destroys on every navigation
+useEyeBreakStore()
 
 // TODO: remember this between reloads once api/ exists.
 const collapsed = ref(false)
@@ -56,6 +60,6 @@ watch(sessionActive, (active) => (collapsed.value = active))
     </main>
 
     <!-- Notifications prompt -->
-    <NotificationPrompt v-if="notifications.promptOpen" />
+    <NotificationPrompt v-if="notifications.asking" :key="notifications.asking" />
   </div>
 </template>

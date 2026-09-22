@@ -212,18 +212,50 @@ describe('the cue at zero', () => {
 })
 
 describe('the prompt', () => {
-  it('takes the click over while the answer is unknown, and holds the session back', async () => {
+  it('takes the click over while an answer is missing, and holds the session back', async () => {
     FakeNotification.permission = 'default'
 
     const { notifications, timer } = await boot()
 
     expect(notifications.promptBeforeStart()).toBe(true)
-    expect(notifications.promptOpen).toBe(true)
+    expect(notifications.asking).toBe('timerEnd')
     expect(timer.status).toBe('stopped')
   })
 
-  it('starts the session once it is accepted', async () => {
+  it('asks one kind at a time and starts the session on the last answer', async () => {
     FakeNotification.permission = 'default'
+
+    const { notifications, settings, timer } = await boot()
+    notifications.promptBeforeStart()
+
+    await notifications.acceptPrompt(false)
+    expect(notifications.asking).toBe('eyeBreak')
+    expect(timer.status).toBe('stopped')
+
+    await notifications.acceptPrompt(false)
+    expect(notifications.promptOpen).toBe(false)
+    expect(timer.status).toBe('running')
+    expect(settings.notifications).toEqual({ timerEnd: true, eyeBreak: true })
+  })
+
+  it('still asks about the eye break after a plain no to the timer', async () => {
+    FakeNotification.permission = 'default'
+
+    const { notifications, settings, timer } = await boot()
+    notifications.promptBeforeStart()
+
+    await notifications.declinePrompt(false)
+    expect(notifications.asking).toBe('eyeBreak')
+    expect(notifications.access).toBe('default')
+
+    await notifications.acceptPrompt(false)
+    expect(settings.notifications).toEqual({ timerEnd: false, eyeBreak: true })
+    expect(timer.status).toBe('running')
+  })
+
+  it('drops the rest of the queue when the browser refuses', async () => {
+    FakeNotification.permission = 'default'
+    FakeNotification.answer = 'denied'
 
     const { notifications, timer } = await boot()
     notifications.promptBeforeStart()
@@ -233,36 +265,44 @@ describe('the prompt', () => {
     expect(timer.status).toBe('running')
   })
 
-  it('starts the session once it is declined', async () => {
-    FakeNotification.permission = 'default'
+  it('asks about a kind that is still off even once the browser said yes', async () => {
+    const { notifications, settings } = await boot()
+    await settings.setNotification('timerEnd', true)
 
-    const { notifications, timer } = await boot()
-    notifications.promptBeforeStart()
-    await notifications.declinePrompt(false)
-
-    expect(notifications.promptOpen).toBe(false)
-    expect(timer.status).toBe('running')
+    expect(notifications.promptBeforeStart()).toBe(true)
+    expect(notifications.asking).toBe('eyeBreak')
   })
 
-  it('stays out of the way once the browser holds an answer', async () => {
-    const { notifications, timer } = await boot()
+  it('stays out of the way once every kind is on', async () => {
+    const { notifications, settings, timer } = await boot()
+    await settings.setNotification('timerEnd', true)
+    await settings.setNotification('eyeBreak', true)
 
     expect(notifications.promptBeforeStart()).toBe(false)
-    expect(notifications.promptOpen).toBe(false)
     expect(timer.status).toBe('stopped')
   })
 
-  it('does not come back after the checkbox', async () => {
+  it('stays out of the way while the browser blocks notifications', async () => {
+    FakeNotification.permission = 'denied'
+
+    const { notifications } = await boot()
+
+    expect(notifications.promptBeforeStart()).toBe(false)
+  })
+
+  it('does not come back for a kind after its checkbox', async () => {
     FakeNotification.permission = 'default'
 
     const { notifications, settings, timer } = await boot()
     notifications.promptBeforeStart()
     await notifications.declinePrompt(true)
+    await notifications.declinePrompt(false)
 
-    expect(settings.notificationPromptDismissed).toBe(true)
+    expect(settings.promptsDismissed).toEqual({ timerEnd: true, eyeBreak: false })
 
     await timer.stop()
-    expect(notifications.promptBeforeStart()).toBe(false)
+    expect(notifications.promptBeforeStart()).toBe(true)
+    expect(notifications.asking).toBe('eyeBreak')
   })
 
   it('comes back after a plain no', async () => {
@@ -271,11 +311,13 @@ describe('the prompt', () => {
     const { notifications, settings, timer } = await boot()
     notifications.promptBeforeStart()
     await notifications.declinePrompt(false)
+    await notifications.declinePrompt(false)
 
-    expect(settings.notificationPromptDismissed).toBe(false)
+    expect(settings.promptsDismissed).toEqual({ timerEnd: false, eyeBreak: false })
 
     await timer.stop()
     expect(notifications.promptBeforeStart()).toBe(true)
+    expect(notifications.asking).toBe('timerEnd')
   })
 
   it('never opens for a session that came back from storage', async () => {
@@ -292,6 +334,7 @@ describe('the prompt', () => {
     FakeNotification.permission = 'default'
 
     const { notifications, settings } = await boot()
+    notifications.promptBeforeStart()
     await notifications.acceptPrompt(false)
 
     expect(settings.notifications.timerEnd).toBe(true)
@@ -303,6 +346,7 @@ describe('the prompt', () => {
     FakeNotification.answer = 'denied'
 
     const { notifications, settings } = await boot()
+    notifications.promptBeforeStart()
     await notifications.acceptPrompt(false)
 
     expect(settings.notifications.timerEnd).toBe(false)

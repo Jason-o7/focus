@@ -1,8 +1,13 @@
 <script setup lang="ts">
-import { onMounted, onUnmounted, ref } from 'vue'
+import { computed, onMounted, onUnmounted, ref } from 'vue'
 import { useNotificationsStore } from '@/stores/notifications'
+import { notificationKind } from '@/types/notification'
 
 const notifications = useNotificationsStore()
+
+const copy = computed(() =>
+  notifications.asking === null ? null : notificationKind(notifications.asking).prompt,
+)
 
 const dismiss = ref(false)
 const sheet = ref<HTMLElement | null>(null)
@@ -48,11 +53,9 @@ const FOOTER_BUTTON =
         aria-modal="true"
         aria-label="Notifications"
       >
-        <h2 class="mb-2 text-subtitle font-medium">Want a nudge at zero?</h2>
+        <h2 class="mb-2 text-subtitle font-medium">{{ copy?.title }}</h2>
 
-        <p class="mb-6 text-body text-text-secondary">
-          Even with this tab buried, you'll know when time is up.
-        </p>
+        <p class="mb-6 text-body text-text-secondary">{{ copy?.body }}</p>
 
         <!-- Stop asking -->
         <label class="mb-6 flex cursor-pointer items-center gap-2.5 text-tiny text-text-muted">
@@ -80,7 +83,7 @@ const FOOTER_BUTTON =
             ]"
             @click="accept()"
           >
-            Nudge me
+            {{ copy?.accept }}
           </button>
         </div>
       </section>

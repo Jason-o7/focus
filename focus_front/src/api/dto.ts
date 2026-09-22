@@ -1,6 +1,7 @@
 import type { Background } from '@/types/background'
 import {
   DEFAULT_NOTIFICATIONS,
+  DEFAULT_PROMPTS_DISMISSED,
   isNotificationKind,
   type NotificationKind,
 } from '@/types/notification'
@@ -26,7 +27,6 @@ export interface BackgroundDto {
 export interface SettingsDto {
   soundId: string
   backgroundId: string
-  eyeBreakEnabled: boolean
   eyeBreakMinutes: number
   eyeBreakPresets: number[]
   mode: TimerMode
@@ -34,7 +34,7 @@ export interface SettingsDto {
   breakMs: number
   dailyGoalMs: number
   notifications: Record<string, boolean>
-  notificationPromptDismissed: boolean
+  promptsDismissed: Record<string, boolean>
 }
 
 export interface SessionDto {
@@ -101,8 +101,11 @@ function toMinuteList(raw: unknown, fallback: number[]): number[] {
   return [...new Set(minutes)].sort((a, b) => a - b)
 }
 
-function toNotifications(raw: unknown): Record<NotificationKind, boolean> {
-  const value = { ...DEFAULT_NOTIFICATIONS }
+function toKindFlags(
+  raw: unknown,
+  fallback: Record<NotificationKind, boolean>,
+): Record<NotificationKind, boolean> {
+  const value = { ...fallback }
   if (!isRecord(raw)) return value
 
   for (const [kind, on] of Object.entries(raw)) {
@@ -119,10 +122,6 @@ export function toSettings(raw: unknown): Settings {
     soundId: typeof raw.soundId === 'string' ? raw.soundId : DEFAULT_SETTINGS.soundId,
     backgroundId:
       typeof raw.backgroundId === 'string' ? raw.backgroundId : DEFAULT_SETTINGS.backgroundId,
-    eyeBreakEnabled:
-      typeof raw.eyeBreakEnabled === 'boolean'
-        ? raw.eyeBreakEnabled
-        : DEFAULT_SETTINGS.eyeBreakEnabled,
     eyeBreakMinutes: isValidEyeBreakMinutes(raw.eyeBreakMinutes)
       ? raw.eyeBreakMinutes
       : DEFAULT_SETTINGS.eyeBreakMinutes,
@@ -131,11 +130,8 @@ export function toSettings(raw: unknown): Settings {
     focusMs: isValidFocusMs(raw.focusMs) ? raw.focusMs : DEFAULT_SETTINGS.focusMs,
     breakMs: isValidBreakMs(raw.breakMs) ? raw.breakMs : DEFAULT_SETTINGS.breakMs,
     dailyGoalMs: isValidGoalMs(raw.dailyGoalMs) ? raw.dailyGoalMs : DEFAULT_SETTINGS.dailyGoalMs,
-    notifications: toNotifications(raw.notifications),
-    notificationPromptDismissed:
-      typeof raw.notificationPromptDismissed === 'boolean'
-        ? raw.notificationPromptDismissed
-        : DEFAULT_SETTINGS.notificationPromptDismissed,
+    notifications: toKindFlags(raw.notifications, DEFAULT_NOTIFICATIONS),
+    promptsDismissed: toKindFlags(raw.promptsDismissed, DEFAULT_PROMPTS_DISMISSED),
   }
 }
 
@@ -261,7 +257,6 @@ export function toSettingsDto(value: Settings): SettingsDto {
   return {
     soundId: value.soundId,
     backgroundId: value.backgroundId,
-    eyeBreakEnabled: value.eyeBreakEnabled,
     eyeBreakMinutes: value.eyeBreakMinutes,
     eyeBreakPresets: [...value.eyeBreakPresets],
     mode: value.mode,
@@ -269,7 +264,7 @@ export function toSettingsDto(value: Settings): SettingsDto {
     breakMs: value.breakMs,
     dailyGoalMs: value.dailyGoalMs,
     notifications: { ...value.notifications },
-    notificationPromptDismissed: value.notificationPromptDismissed,
+    promptsDismissed: { ...value.promptsDismissed },
   }
 }
 

@@ -72,6 +72,11 @@ export const useTimerStore = defineStore('timer', () => {
 
   const elapsedMs = computed(() => elapsedAt(now.value))
 
+  /** Focus time in this session so far. The break freezes it, because resting is not focusing. */
+  const focusedSoFarMs = computed(() =>
+    phase.value === 'focus' ? elapsedMs.value : focusedMs.value,
+  )
+
   const targetMs = computed(() => {
     if (mode.value === 'stopwatch') return null
     return phase.value === 'focus' ? focusMs.value : breakMs.value
@@ -294,6 +299,7 @@ export const useTimerStore = defineStore('timer', () => {
     breakMs,
     focusedMs,
     elapsedMs,
+    focusedSoFarMs,
     targetMs,
     remainingMs,
     isOvertime,

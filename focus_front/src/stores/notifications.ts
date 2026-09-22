@@ -2,7 +2,11 @@ import { defineStore } from 'pinia'
 import { computed, ref, watch } from 'vue'
 import { useSettingsStore } from '@/stores/settings'
 import { useTimerStore } from '@/stores/timer'
-import { DEFAULT_NOTIFICATIONS, type NotificationKind } from '@/types/notification'
+import {
+  DEFAULT_NOTIFICATIONS,
+  NOTIFICATION_CATALOG,
+  type NotificationKind,
+} from '@/types/notification'
 import { playOvertime, scheduleOvertime, type CueHandle } from '@/utils/cues'
 import {
   notify,
@@ -74,36 +78,61 @@ export const useNotificationsStore = defineStore('notifications', () => {
   // #endregion
 
   // #region The prompt on starting a session
-  const promptOpen = ref(false)
+  const queue = ref<NotificationKind[]>([])
 
-  const canPrompt = computed(
-    () => settings.loaded && !settings.notificationPromptDismissed && access.value === 'default',
-  )
+  /** The kind the overlay is asking about right now. One overlay per kind, in catalog order. */
+  const asking = computed<NotificationKind | null>(() => queue.value[0] ?? null)
+
+  const promptOpen = computed(() => asking.value !== null)
+
+  // Blocked or unsupported is a closed door: there is nothing an overlay could offer
+  function pending(): NotificationKind[] {
+    if (!settings.loaded) return []
+    if (!supported.value || blocked.value) return []
+
+    return NOTIFICATION_CATALOG.map((kind) => kind.id).filter(
+      (id) => !settings.notifications[id] && !settings.promptsDismissed[id],
+    )
+  }
+
+  const canPrompt = computed(() => pending().length > 0)
 
   /** True when the prompt took the click over: answering it is what starts the session. */
   function promptBeforeStart() {
-    if (!canPrompt.value) return false
+    const kinds = pending()
+    if (kinds.length === 0) return false
 
-    promptOpen.value = true
+    queue.value = kinds
     return true
   }
 
-  async function acceptPrompt(dismiss: boolean) {
-    promptOpen.value = false
-    void timer.start()
+  async function answerPrompt(yes: boolean, dismiss: boolean) {
+    const kind = asking.value
+    if (kind === null) return
 
-    // * Nothing may be awaited before this line, or the click no longer counts as a gesture
-    const answer = await ask()
+    const rest = queue.value.slice(1)
+    queue.value = rest
 
-    if (answer === 'granted') await settings.setNotification('timerEnd', true)
-    if (dismiss) await settings.dismissNotificationPrompt()
+    // * Nothing may be awaited before the request, or the click no longer counts as a gesture
+    if (rest.length === 0) void timer.start()
+    const answer = yes && access.value === 'default' ? ask() : Promise.resolve(access.value)
+
+    if (yes && (await answer) === 'granted') await settings.setNotification(kind, true)
+    if (dismiss) await settings.dismissPrompt(kind)
+
+    // One refusal in the browser shuts every kind at once, so the rest of the queue is pointless
+    if (queue.value.length > 0 && (!supported.value || blocked.value)) {
+      queue.value = []
+      void timer.start()
+    }
   }
 
-  async function declinePrompt(dismiss: boolean) {
-    promptOpen.value = false
+  function acceptPrompt(dismiss: boolean) {
+    return answerPrompt(true, dismiss)
+  }
 
-    await timer.start()
-    if (dismiss) await settings.dismissNotificationPrompt()
+  function declinePrompt(dismiss: boolean) {
+    return answerPrompt(false, dismiss)
   }
   // #endregion
 
@@ -167,6 +196,7 @@ export const useNotificationsStore = defineStore('notifications', () => {
     supported,
     blocked,
     promptOpen,
+    asking,
     canPrompt,
     enabled,
     send,

@@ -2,6 +2,7 @@
 import { computed, nextTick, onUnmounted, ref, useTemplateRef, watch } from 'vue'
 import { useBackgroundsStore } from '@/stores/backgrounds'
 import { useHomeStore } from '@/stores/home'
+import { useNotificationsStore } from '@/stores/notifications'
 import { useSettingsStore } from '@/stores/settings'
 import { useSoundsStore } from '@/stores/sounds'
 
@@ -9,6 +10,7 @@ const settings = useSettingsStore()
 const sounds = useSoundsStore()
 const backgrounds = useBackgroundsStore()
 const home = useHomeStore()
+const notifications = useNotificationsStore()
 
 const CHIP_BASE =
   'cursor-pointer rounded-full border px-3 py-2.5 text-tiny leading-none transition-colors duration-150 motion-reduce:transition-none'
@@ -17,6 +19,22 @@ function chipClass(selected: boolean) {
   return selected
     ? 'border-accent bg-accent-soft text-accent'
     : 'border-border bg-surface text-text-secondary hover:border-text-muted hover:text-text-primary'
+}
+
+// #region Eye break
+// The nudge only ever arrives as a notification, so the browser's answer decides whether it runs
+const eyeBreakOn = computed(() => settings.notifications.eyeBreak)
+
+const eyeBreakShut = computed(() => !notifications.supported || notifications.blocked)
+
+const eyeBreakShutReason = computed(() =>
+  notifications.supported
+    ? 'Notifications are blocked. Allow them for this site to turn this back on.'
+    : 'This browser cannot show notifications, so this cannot run.',
+)
+
+function toggleEyeBreak() {
+  void notifications.setEnabled('eyeBreak', !eyeBreakOn.value)
 }
 
 const eyeBreakInfoPinned = ref(false)
@@ -34,6 +52,7 @@ watch(eyeBreakInfoPinned, (pinned) => {
 })
 
 onUnmounted(() => document.removeEventListener('click', unpinEyeBreakInfoOnOutsideClick))
+// #endregion
 
 // TODO: the add and remove interaction is not designed yet.
 const addingPreset = ref(false)
@@ -237,34 +256,40 @@ function cancelPreset() {
             </span>
           </div>
 
-          <label class="relative inline-flex shrink-0 cursor-pointer">
+          <label
+            class="relative inline-flex shrink-0"
+            :class="eyeBreakShut ? 'cursor-not-allowed opacity-40' : 'cursor-pointer'"
+          >
             <input
               type="checkbox"
-              class="peer absolute inset-0 m-0 cursor-pointer opacity-0"
-              :checked="settings.eyeBreakEnabled"
-              @change="settings.toggleEyeBreak()"
+              class="peer absolute inset-0 m-0 opacity-0"
+              :class="eyeBreakShut ? 'cursor-not-allowed' : 'cursor-pointer'"
+              :checked="eyeBreakOn"
+              :disabled="eyeBreakShut"
+              @change="toggleEyeBreak()"
             />
             <span
               class="box-border h-6 w-11 rounded-full border transition-colors duration-150 peer-focus-visible:ring-2 peer-focus-visible:ring-accent motion-reduce:transition-none"
-              :class="
-                settings.eyeBreakEnabled ? 'border-accent bg-accent' : 'border-border bg-background'
-              "
+              :class="eyeBreakOn ? 'border-accent bg-accent' : 'border-border bg-background'"
             >
               <span
                 class="m-0.75 block size-4 rounded-full transition-transform duration-150 motion-reduce:transition-none"
-                :class="
-                  settings.eyeBreakEnabled ? 'translate-x-5 bg-background' : 'bg-text-secondary'
-                "
+                :class="eyeBreakOn ? 'translate-x-5 bg-background' : 'bg-text-secondary'"
               />
             </span>
             <span class="sr-only">Remind me to rest my eyes</span>
           </label>
         </div>
 
+        <!-- Eye break - Closed door -->
+        <p v-if="eyeBreakShut" class="mb-2.5 text-tiny leading-relaxed text-info">
+          {{ eyeBreakShutReason }}
+        </p>
+
         <!-- Eye break - Intervals -->
         <div
           class="flex flex-wrap gap-1 transition-opacity duration-150 motion-reduce:transition-none"
-          :class="settings.eyeBreakEnabled ? 'opacity-100' : 'pointer-events-none opacity-35'"
+          :class="eyeBreakOn && !eyeBreakShut ? 'opacity-100' : 'pointer-events-none opacity-35'"
         >
           <span
             v-for="minutes in settings.eyeBreakPresets"
@@ -275,7 +300,7 @@ function cancelPreset() {
             <button
               type="button"
               class="cursor-pointer rounded-l-full border-0 bg-transparent py-2.5 pr-1 pl-3 text-inherit"
-              :disabled="!settings.eyeBreakEnabled"
+              :disabled="!eyeBreakOn || eyeBreakShut"
               :aria-pressed="settings.eyeBreakMinutes === minutes"
               @click="settings.setEyeBreakMinutes(minutes)"
             >
@@ -285,7 +310,7 @@ function cancelPreset() {
             <button
               type="button"
               class="mr-1 flex size-4 shrink-0 cursor-pointer items-center justify-center rounded-full border-0 bg-transparent p-0 text-inherit transition-colors duration-150 hover:bg-current/20 disabled:invisible motion-reduce:transition-none"
-              :disabled="!settings.eyeBreakEnabled || settings.eyeBreakPresets.length <= 1"
+              :disabled="!eyeBreakOn || eyeBreakShut || settings.eyeBreakPresets.length <= 1"
               :aria-label="`Remove ${minutes} min`"
               @click="settings.removeEyeBreakPreset(minutes)"
             >
@@ -327,7 +352,7 @@ function cancelPreset() {
             type="button"
             class="inline-flex items-center"
             :class="[CHIP_BASE, chipClass(false)]"
-            :disabled="!settings.eyeBreakEnabled"
+            :disabled="!eyeBreakOn || eyeBreakShut"
             aria-label="Add another interval"
             @click="startAddingPreset"
           >

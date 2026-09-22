@@ -329,4 +329,28 @@ export function scheduleOvertime(inSeconds: number): CueHandle | null {
   overtime(booked.rig)
   return booked.handle
 }
+
+/** Two soft marimba notes falling. Quiet on purpose: it asks to look up, it does not celebrate. */
+function eyeBreak(rig: Rig) {
+  const root = 880
+
+  mallet(rig, { freq: root, dur: 0.7, peak: 0.19, send: 0.5 })
+  mallet(rig, { freq: semitone(root, -5), at: 0.16, dur: 1.1, peak: 0.16, send: 0.5 })
+}
+
+export function playEyeBreak() {
+  const audio = wake()
+  if (audio === null) return
+
+  eyeBreak(audio)
+}
+
+/** Same booking as the overtime cue, for the same reason: the tab is hidden when it matters. */
+export function scheduleEyeBreak(inSeconds: number): CueHandle | null {
+  const booked = book(inSeconds)
+  if (booked === null) return null
+
+  eyeBreak(booked.rig)
+  return booked.handle
+}
 // #endregion

@@ -91,10 +91,10 @@ describe('toSettings', () => {
 
   it('keeps the notification kinds it knows and drops the rest', () => {
     const settings = toSettings({
-      notifications: { timerEnd: true, eyeBreak: true, whatever: 'yes' },
+      notifications: { timerEnd: true, coffeeTime: true, whatever: 'yes' },
     })
 
-    expect(settings.notifications).toEqual({ timerEnd: true })
+    expect(settings.notifications).toEqual({ timerEnd: true, eyeBreak: false })
   })
 
   it('lands an unknown kind on its default', () => {
